@@ -877,7 +877,57 @@ fun ParentMonitoringAndPrivacyView(
                     }
                 }
 
-                // 6. Botão de Alterar Usuário / Novo Cadastro
+                // 6. Atualizações do Aplicativo (In-App GitHub OTA)
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFF8FAFC)),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(16.dp))
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.Security,
+                                        contentDescription = null,
+                                        tint = SafeTalkPrimary,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            text = "Atualizações do App",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp,
+                                            color = SafeTalkDark
+                                        )
+                                        Text(
+                                            text = "Versão atual: v${com.example.BuildConfig.VERSION_NAME}",
+                                            fontSize = 11.sp,
+                                            color = Color(0xFF64748B)
+                                        )
+                                    }
+                                }
+
+                                Button(
+                                    onClick = { viewModel.checkForAppUpdates() },
+                                    colors = ButtonDefaults.buttonColors(containerColor = SafeTalkPrimary),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Text("Buscar", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 7. Botão de Alterar Usuário / Novo Cadastro
                 item {
                     Button(
                         onClick = { viewModel.showProfileEditorDialog.value = true },
