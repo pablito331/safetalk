@@ -1,0 +1,7 @@
+{
+  "name": "SafeTalk",
+  "description": "Mensageiro familiar seguro com controle parental, filtro divertido de palavrões, armazenamento 100% local e tarefas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_id": "safetalk-demo",
+    "project_number": "123456789012",
+    "storage_bucket": "safetalk-demo.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:123456789012:android:8d7d5c7e7d4c7d3c",
+        "android_client_info": {
+          "package_name": "com.aistudio.familiasafe.kzwpq"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDUMMYKEY_FOR_LOCAL_TESTING"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
