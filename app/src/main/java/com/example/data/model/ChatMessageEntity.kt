@@ -15,5 +15,9 @@ data class ChatMessageEntity(
     val timestamp: Long = System.currentTimeMillis(),
     val formattedTime: String = "14:32",
     val isRead: Boolean = true,
-    val isFlaggedByFilter: Boolean = false
+    val isFlaggedByFilter: Boolean = false,
+    // --- Mensageria entre dispositivos ---
+    val remoteId: String = "",        // uuid da fila no servidor (dedup)
+    val senderIdentity: String = "",  // login_identifier de quem enviou
+    val recipientIdentity: String = "" // login_identifier de quem recebe
 )

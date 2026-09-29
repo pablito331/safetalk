@@ -21,6 +21,7 @@ import com.example.util.FunProfanityFilter
 import com.example.util.OnboardingRules
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -36,6 +37,7 @@ import java.util.Locale
 import com.example.util.AppUpdateInfo
 import com.example.util.GitHubUpdateManager
 import android.content.Context
+import com.example.data.supabase.SupabaseConfig
 import com.example.data.supabase.SupabaseAuthService
 import com.example.data.supabase.AuthResult
 
@@ -108,6 +110,33 @@ class FamilySafeViewModel(application: Application) : AndroidViewModel(applicati
             }
         }
         checkForAppUpdates()
+        startIncomingMessageLoop()
+    }
+
+    /**
+     * Loop de recebimento: busca mensagens destinadas a este aparelho a cada
+     * ~20s enquanto o ViewModel estiver vivo. Mensagens novas entram no Room
+     * (a UI reage automaticamente via Flow) e são apagadas da fila do servidor.
+     */
+    private var incomingLoopJob: kotlinx.coroutines.Job? = null
+    private fun startIncomingMessageLoop() {
+        incomingLoopJob?.cancel()
+        incomingLoopJob = viewModelScope.launch {
+            while (isActive) { // recebe mensagens enquanto o app vive
+                try {
+                    val profile = childProfile.value
+                    if (profile != null && SupabaseConfig.IS_CONFIGURED) {
+                        val myIdentity = profile.loginIdentifier.trim().lowercase()
+                        if (myIdentity.isNotBlank()) {
+                            repository.syncIncomingMessages(profile, myIdentity)
+                        }
+                    }
+                } catch (_: Exception) {
+                    // offline/falha de rede: tenta de novo no próximo ciclo
+                }
+                kotlinx.coroutines.delay(20_000L)
+            }
+        }
     }
 
     fun checkForAppUpdates() {
@@ -401,6 +430,7 @@ class FamilySafeViewModel(application: Application) : AndroidViewModel(applicati
             }
 
             val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+            val myIdentity = profile?.loginIdentifier?.trim()?.lowercase().orEmpty()
             repository.sendMessage(
                 ChatMessageEntity(
                     contactId = contactId,
@@ -408,7 +438,9 @@ class FamilySafeViewModel(application: Application) : AndroidViewModel(applicati
                     text = sanitizedText,
                     mediaType = "TEXT",
                     formattedTime = time
-                )
+                ),
+                myIdentity = myIdentity,
+                contactRemoteIdentity = contact?.remoteIdentity.orEmpty()
             )
 
             if (!isFamilyConversation && contact != null && profile != null && profile.userRole == "CHILD") {

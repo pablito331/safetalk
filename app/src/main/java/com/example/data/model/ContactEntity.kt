@@ -15,5 +15,8 @@ data class ContactEntity(
     val isOnline: Boolean = false,
     val lastSeen: String = "Online",
     val unreadCount: Int = 0,
-    val avatarColor: Long = 0xFF008069
+    val avatarColor: Long = 0xFF008069,
+    // Identidade de rede deste contato (e-mail/@usuário no SafeTalk) —
+    // é o endereço usado para entregar mensagens entre celulares.
+    val remoteIdentity: String = ""
 )

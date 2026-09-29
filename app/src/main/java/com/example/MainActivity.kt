@@ -71,6 +71,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // Contexto para a identidade de dispositivo do Supabase (mensageria real)
+        com.example.data.supabase.SupabaseSyncService.appContext = applicationContext
         setContent {
             MyApplicationTheme {
                 val viewModel: FamilySafeViewModel = viewModel()

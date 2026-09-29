@@ -24,6 +24,64 @@ class FamilyRepository(
     private val syncService: SupabaseSyncService = SupabaseSyncService()
 ) {
 
+    /**
+     * Sincronização real entre celulares.
+     * Deve ser chamada periodicamente (loop do ViewModel).
+     * Retorna quantas mensagens novas foram gravadas localmente.
+     */
+    suspend fun syncIncomingMessages(profile: ChildProfileEntity, myIdentity: String): Int {
+        val token = try {
+            syncService.ensureAuthenticated(profile)
+        } catch (_: Exception) { null } ?: return 0
+
+        val incoming = syncService.fetchIncomingMessages(profile)
+        if (incoming.isEmpty()) return 0
+
+        var inserted = 0
+        val deliveredIds = mutableListOf<String>()
+        for ((remoteId, msg) in incoming) {
+            // Dedup: já baixei esta mensagem antes?
+            if (dao.getMessageByRemoteId(remoteId) != null) {
+                deliveredIds.add(remoteId)
+                continue
+            }
+            // Mapeia o remetente remoto para um contato local
+            val senderIdentity = msg.senderIdentity
+            val contact = dao.getContactByRemoteIdentityOnce(senderIdentity)
+                ?: dao.getContactByPhoneOrEmailOnce(senderIdentity)
+
+            val finalContactId = contact?.id ?: run {
+                // Remetente desconhecido: cria contato PENDENTE para aprovação dos pais
+                val newId = dao.insertContact(
+                    ContactEntity(
+                        name = senderIdentity.substringBefore("@").ifBlank { "Desconhecido" },
+                        phone = senderIdentity,
+                        relationship = "Novo contato",
+                        relationshipType = "EXTERNAL",
+                        isApprovedByParent = false,
+                        safetyStatus = "PENDENTE",
+                        remoteIdentity = senderIdentity
+                    )
+                )
+                newId
+            }
+
+            dao.insertMessage(
+                msg.copy(
+                    contactId = finalContactId,
+                    // Aplica o filtro divertido nas mensagens recebidas
+                    text = com.example.util.FunProfanityFilter.filter(msg.text).sanitizedText
+                )
+            )
+            inserted++
+            deliveredIds.add(remoteId)
+        }
+
+        // Remove da fila do servidor o que já foi coletado
+        syncService.deleteDelivered(deliveredIds)
+        return inserted
+    }
+
     val allContacts: Flow<List<ContactEntity>> = dao.getAllContacts()
     val allTasks: Flow<List<FamilyTaskEntity>> = dao.getAllTasks()
     val childProfile: Flow<ChildProfileEntity?> = dao.getChildProfile()
@@ -39,10 +97,17 @@ class FamilyRepository(
         return dao.getMessagesForContact(contactId)
     }
 
-    suspend fun sendMessage(message: ChatMessageEntity): Long {
+    suspend fun sendMessage(
+        message: ChatMessageEntity,
+        myIdentity: String = "",
+        contactRemoteIdentity: String = ""
+    ): Long {
         val id = dao.insertMessage(message)
         try {
-            syncService.sendMessage(message.copy(id = id))
+            syncService.sendMessage(
+                message.copy(id = id)
+                    .copy(senderIdentity = myIdentity, recipientIdentity = contactRemoteIdentity)
+            )
         } catch (_: Exception) {}
         return id
     }

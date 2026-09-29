@@ -29,6 +29,12 @@ interface FamilyDao {
     @Query("SELECT * FROM contacts WHERE id = :contactId LIMIT 1")
     fun getContactById(contactId: Long): Flow<ContactEntity?>
 
+    @Query("SELECT * FROM contacts WHERE lower(remoteIdentity) = :identity LIMIT 1")
+    suspend fun getContactByRemoteIdentityOnce(identity: String): ContactEntity?
+
+    @Query("SELECT * FROM contacts WHERE lower(phone) = :identity OR lower(phone) = :identity LIMIT 1")
+    suspend fun getContactByPhoneOrEmailOnce(identity: String): ContactEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertContact(contact: ContactEntity): Long
 
@@ -47,6 +53,9 @@ interface FamilyDao {
 
     @Query("SELECT * FROM chat_messages ORDER BY timestamp DESC")
     fun getAllMessages(): Flow<List<ChatMessageEntity>>
+
+    @Query("SELECT * FROM chat_messages WHERE remoteId = :remoteId LIMIT 1")
+    suspend fun getMessageByRemoteId(remoteId: String): ChatMessageEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMessage(message: ChatMessageEntity): Long
