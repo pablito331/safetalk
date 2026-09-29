@@ -17,8 +17,10 @@ android {
     applicationId = "com.aistudio.familiasafe.kzwpq"
     minSdk = 24
     targetSdk = 36
-    versionCode = 1
-    versionName = "0.0.1"
+    // CI passes -PappVersionName / -PappVersionCode so the APK version matches
+    // the GitHub Release tag (required for the in-app auto-update check).
+    versionCode = (project.findProperty("appVersionCode") as String?)?.toIntOrNull() ?: 1
+    versionName = (project.findProperty("appVersionName") as String?) ?: "0.0.1"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
