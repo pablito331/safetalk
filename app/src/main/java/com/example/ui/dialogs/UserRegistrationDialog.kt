@@ -74,7 +74,9 @@ fun UserRegistrationDialog(
 ) {
     var name by remember { mutableStateOf(initialName) }
     var ageText by remember { mutableStateOf(initialAge.toString()) }
-    var isEmailSelected by remember { mutableStateOf(initialLogin.contains("@")) }
+    // E-mail é a identidade principal no SafeTalk (evita exigir chip de celular para crianças).
+    // Telefone continua aceito como alternativa opcional.
+    var isEmailSelected by remember { mutableStateOf(initialLogin.isBlank() || initialLogin.contains("@")) }
     var loginIdentifier by remember { mutableStateOf(initialLogin) }
     var pin by remember { mutableStateOf("") }
     var spouseName by remember { mutableStateOf(initialSpouseName) }
@@ -171,9 +173,9 @@ fun UserRegistrationDialog(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Tipo de Login: Telefone ou E-mail (útil para crianças sem celular com chip)
+                    // Tipo de Login: E-mail (padrão, sem necessidade de chip) ou Telefone (opcional)
                     Text(
-                        text = "Entrar com:",
+                        text = "Entrar com: (e-mail recomendado — telefone é opcional)",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Color(0xFF475569)

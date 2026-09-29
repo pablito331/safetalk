@@ -334,7 +334,7 @@ class FamilySafeViewModel(application: Application) : AndroidViewModel(applicati
                     ChatMessageEntity(
                         contactId = 1L,
                         sender = "SYSTEM",
-                        text = "🔔 Novo pedido de amizade: Seu filho pediu para conversar com $name ($phone). Você pode autorizar no painel de supervisão.",
+                        text = "🔔 Novo pedido de amizade: Seu filho pediu para conversar com $name${if (phone.isBlank()) "" else " ($phone)"}. Você pode autorizar no painel de supervisão.",
                         mediaType = "TEXT",
                         formattedTime = time
                     )

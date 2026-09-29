@@ -98,7 +98,7 @@ fun AddNewContactDialog(
                     text = if (isParent)
                         "Cadastre um novo amigo ou familiar para conversar de forma segura e criptografada com seu filho:"
                     else
-                        "Digite o nome e telefone do seu amigo(a). Seus pais poderão analisar e aprovar a conversa:",
+                        "Digite o nome e (opcionalmente) o e-mail ou telefone do seu amigo(a). Seus pais poderão analisar e aprovar a conversa:",
                     fontSize = 12.sp,
                     color = Color(0xFF475569)
                 )
@@ -123,12 +123,12 @@ fun AddNewContactDialog(
                 OutlinedTextField(
                     value = phone,
                     onValueChange = { phone = it; errorMessage = null },
-                    label = { Text("Telefone / WhatsApp") },
-                    placeholder = { Text("(11) 98888-7777") },
+                    label = { Text("E-mail ou Telefone (opcional)") },
+                    placeholder = { Text("ex: amiga@escola.com") },
                     leadingIcon = {
                         Icon(Icons.Default.Phone, contentDescription = null, tint = WhatsAppDarkTeal)
                     },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -179,9 +179,9 @@ fun AddNewContactDialog(
                 onClick = {
                     if (name.isBlank()) {
                         errorMessage = "Por favor, preencha o nome do contato."
-                    } else if (phone.isBlank()) {
-                        errorMessage = "Por favor, digite o telefone do contato."
                     } else {
+                        // E-mail/telefone é opcional: a identidade principal é o e-mail,
+                        // e nenhuma criança precisa de chip para usar o SafeTalk.
                         onConfirm(name.trim(), phone.trim(), relationship.trim().ifBlank { "Amigo" }, if (isParent) autoApprove else false)
                     }
                 },

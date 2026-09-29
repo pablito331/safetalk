@@ -95,7 +95,7 @@ fun ApproveContactDialog(
                             fontSize = 17.sp
                         )
                         Text(
-                            text = contact.phone,
+                            text = contact.phone.ifBlank { "Sem e-mail/telefone cadastrado" },
                             fontSize = 13.sp,
                             color = Color.Gray
                         )

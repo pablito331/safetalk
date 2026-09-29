@@ -425,7 +425,7 @@ fun ParentConversationsView(
                             }
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "${contact.relationship} • ${contact.phone}",
+                                text = "${contact.relationship}${if (contact.phone.isBlank()) "" else " • ${contact.phone}"}",
                                 fontSize = 12.sp,
                                 color = Color(0xFF64748B),
                                 maxLines = 1

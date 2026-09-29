@@ -454,7 +454,7 @@ fun ChildChatsView(
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = "${contact.relationship} • ${contact.phone}",
+                                    text = "${contact.relationship}${if (contact.phone.isBlank()) "" else " • ${contact.phone}"}",
                                     fontSize = 12.sp,
                                     color = Color.Gray,
                                     maxLines = 1

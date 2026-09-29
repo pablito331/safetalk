@@ -351,7 +351,7 @@ fun ParentMonitoringAndPrivacyView(
                                             color = Color(0xFF1E293B)
                                         )
                                         Text(
-                                            text = "${pending.relationship} • ${pending.phone}",
+                                            text = "${pending.relationship}${if (pending.phone.isBlank()) "" else " • ${pending.phone}"}",
                                             fontSize = 12.sp,
                                             color = Color(0xFF475569)
                                         )
@@ -481,7 +481,7 @@ fun ParentMonitoringAndPrivacyView(
                                         }
 
                                         Text(
-                                            text = if (isMonitoring) "${contact.relationship} • ${contact.phone}" else "🔒 Mensagens protegidas por privacidade",
+                                            text = if (isMonitoring) "${contact.relationship}${if (contact.phone.isBlank()) "" else " • ${contact.phone}"}" else "🔒 Mensagens protegidas por privacidade",
                                             fontSize = 12.sp,
                                             color = Color.Gray,
                                             maxLines = 1
