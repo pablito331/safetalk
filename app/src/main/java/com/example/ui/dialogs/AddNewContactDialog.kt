@@ -96,9 +96,9 @@ fun AddNewContactDialog(
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
                     text = if (isParent)
-                        "Cadastre um novo amigo ou familiar para conversar de forma segura e criptografada com seu filho:"
+                        "Cadastre um contato de outra família pelo @usuário, e-mail ou telefone. A conexão só acontece após aprovação dos dois lados:"
                     else
-                        "Digite o nome e (opcionalmente) o e-mail ou telefone do seu amigo(a). Seus pais poderão analisar e aprovar a conversa:",
+                        "Digite o nome e (opcionalmente) o @usuário, e-mail ou telefone do seu amigo(a). Seus pais poderão analisar e aprovar a conversa:",
                     fontSize = 12.sp,
                     color = Color(0xFF475569)
                 )
@@ -123,8 +123,8 @@ fun AddNewContactDialog(
                 OutlinedTextField(
                     value = phone,
                     onValueChange = { phone = it; errorMessage = null },
-                    label = { Text("E-mail ou Telefone (opcional)") },
-                    placeholder = { Text("ex: amiga@escola.com") },
+                    label = { Text("@usuário, e-mail ou telefone (opcional)") },
+                    placeholder = { Text("ex: @ana.fam-7k4q9x2m") },
                     leadingIcon = {
                         Icon(Icons.Default.Phone, contentDescription = null, tint = WhatsAppDarkTeal)
                     },

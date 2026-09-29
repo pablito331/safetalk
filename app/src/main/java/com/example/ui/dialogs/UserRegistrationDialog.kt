@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -56,6 +57,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.ui.theme.SafeTalkAccent
 import com.example.ui.theme.SafeTalkDark
 import com.example.ui.theme.SafeTalkPrimary
@@ -70,7 +72,7 @@ fun UserRegistrationDialog(
     initialSpouseName: String = "",
     initialSpouseContact: String = "",
     onDismiss: () -> Unit,
-    onSave: (name: String, age: Int, login: String, isEmail: Boolean, pin: String, spouseName: String, spouseContact: String, familyCode: String, isAutonomous: Boolean) -> Unit
+    onSave: (name: String, age: Int, login: String, isEmail: Boolean, pin: String, spouseName: String, spouseContact: String, familyCode: String, isAutonomous: Boolean, joinFamily: Boolean, desiredHierarchy: String) -> Unit
 ) {
     var name by remember { mutableStateOf(initialName) }
     var ageText by remember { mutableStateOf(initialAge.toString()) }
@@ -83,19 +85,25 @@ fun UserRegistrationDialog(
     var spouseContact by remember { mutableStateOf(initialSpouseContact) }
     var linkSpouseChecked by remember { mutableStateOf(true) }
     var isAutonomousChild by remember { mutableStateOf(false) }
+    var joinMode by remember { mutableStateOf(false) }
+    var desiredRole by remember { mutableStateOf("Filha") }
     var familyCodeInput by remember { mutableStateOf("") }
 
     val age = ageText.toIntOrNull() ?: 0
     val isAdult = age >= 18
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false) // largura total em celulares
+    ) {
         Surface(
             shape = RoundedCornerShape(24.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 6.dp,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 16.dp)
+                .widthIn(max = 480.dp) // em telas grandes não fica largo demais
+                .padding(vertical = 24.dp, horizontal = 16.dp)
                 .testTag("dialog_user_registration")
         ) {
             Column(
@@ -427,6 +435,67 @@ fun UserRegistrationDialog(
 
                                 Spacer(modifier = Modifier.height(10.dp))
 
+                                // Escolha: criar nova família OU entrar em uma existente com código
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(if (!joinMode) SafeTalkPrimary else Color(0xFFF1F5F9))
+                                            .border(1.dp, if (!joinMode) SafeTalkPrimary else Color(0xFFCBD5E1), RoundedCornerShape(12.dp))
+                                            .clickable { joinMode = false }
+                                            .padding(vertical = 10.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("Criar minha família", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (!joinMode) Color.White else Color(0xFF64748B))
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(if (joinMode) SafeTalkPrimary else Color(0xFFF1F5F9))
+                                            .border(1.dp, if (joinMode) SafeTalkPrimary else Color(0xFFCBD5E1), RoundedCornerShape(12.dp))
+                                            .clickable { joinMode = true }
+                                            .padding(vertical = 10.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("Entrar com código", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (joinMode) Color.White else Color(0xFF64748B))
+                                    }
+                                }
+
+                                if (joinMode) {
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    OutlinedTextField(
+                                        value = familyCodeInput,
+                                        onValueChange = { familyCodeInput = it.uppercase() },
+                                        label = { Text("Código da Família (ex: FAM-7K4Q9X2M)") },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "Sua hierarquia (os pais confirmam depois):",
+                                        fontSize = 11.sp,
+                                        color = Color(0xFF475569)
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        listOf("Filha", "Filho", "Responsável").forEach { role ->
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(10.dp))
+                                                    .background(if (desiredRole == role) SafeTalkPrimary else Color(0xFFF1F5F9))
+                                                    .border(1.dp, if (desiredRole == role) SafeTalkPrimary else Color(0xFFCBD5E1), RoundedCornerShape(10.dp))
+                                                    .clickable { desiredRole = role }
+                                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                                            ) {
+                                                Text(role, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = if (desiredRole == role) Color.White else Color(0xFF334155))
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if (!joinMode) {
                                 OutlinedTextField(
                                     value = pin,
                                     onValueChange = { if (it.length <= 4) pin = it.filter { c -> c.isDigit() } },
@@ -514,6 +583,7 @@ fun UserRegistrationDialog(
                                         )
                                     )
                                 }
+                                } // fim if (!joinMode)
                             }
                         }
                     }
@@ -563,10 +633,12 @@ fun UserRegistrationDialog(
                                     loginIdentifier.ifEmpty { if (isAdult) "pai@familia.com" else "filho@familia.com" },
                                     isEmailSelected,
                                     pin.ifEmpty { "" },
-                                    if (linkSpouseChecked) spouseName else "",
-                                    if (linkSpouseChecked) spouseContact else "",
+                                    if (linkSpouseChecked && !joinMode) spouseName else "",
+                                    if (linkSpouseChecked && !joinMode) spouseContact else "",
                                     familyCodeInput,
-                                    isAutonomousChild
+                                    isAutonomousChild,
+                                    joinMode,
+                                    desiredRole
                                 )
                             },
                             colors = ButtonDefaults.buttonColors(

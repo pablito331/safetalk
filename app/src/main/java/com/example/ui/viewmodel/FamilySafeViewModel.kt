@@ -272,7 +272,24 @@ class FamilySafeViewModel(application: Application) : AndroidViewModel(applicati
         isParentReviewModeActive.value = false
     }
 
+    /**
+     * Modo auditoria: reservado para os pais supervisonarem as conversas dos FILHOS.
+     * Pais não auditam outros adultos da mesma família (cônjuge etc.) — entre
+     * adultos a conversa é normal e privada, conforme regra do produto.
+     */
     fun openChatForParentReview(contactId: Long) {
+        val target = contacts.value.find { it.id == contactId } ?: return
+        val isFamilyAdult = target.relationshipType.equals("FAMILY", true) &&
+            (target.relationship.equals("Mãe", true) ||
+                target.relationship.equals("Pai", true) ||
+                target.relationship.contains("Cônjuge", true) ||
+                target.relationship.contains("Esposa", true) ||
+                target.relationship.contains("Esposo", true))
+        if (isFamilyAdult) {
+            // Entre adultos da mesma família: abre sem auditoria.
+            openChat(contactId)
+            return
+        }
         _selectedContactId.value = contactId
         isParentReviewModeActive.value = true
     }
@@ -1088,22 +1105,27 @@ class FamilySafeViewModel(application: Application) : AndroidViewModel(applicati
         spouseName: String,
         spouseContact: String,
         familyCode: String,
-        isAutonomousChild: Boolean
+        isAutonomousChild: Boolean,
+        joinFamily: Boolean = false,
+        desiredHierarchy: String = ""
     ) {
         val current = childProfile.value ?: ChildProfileEntity()
         val isAdult = age >= 18
-        val requiresCode = OnboardingRules.requiresFamilyCode(age, isAutonomousChild)
         val normalizedCode = OnboardingRules.normalizeFamilyCode(familyCode)
 
-        if (requiresCode && normalizedCode.isBlank()) {
+        // Entrar numa família existente exige o código — independente da idade.
+        if (joinFamily && normalizedCode.isBlank()) {
             return
         }
 
         viewModelScope.launch {
-            val resolvedFamilyCode = if (isAdult) {
-                OnboardingRules.generateFamilyCode()
-            } else {
+            // Criar família: gera código novo. Entrar: usa o código informado e
+            // fica PENDENTE até os pais aprovarem e confirmarem a hierarquia.
+            val joining = joinFamily && normalizedCode.isNotBlank()
+            val resolvedFamilyCode = if (joining) {
                 normalizedCode
+            } else {
+                OnboardingRules.generateFamilyCode()
             }
 
             val updated = current.copy(
@@ -1111,20 +1133,34 @@ class FamilySafeViewModel(application: Application) : AndroidViewModel(applicati
                 name = name.ifBlank { current.name },
                 age = age,
                 userRole = if (isAdult) "PARENT" else "CHILD",
-                familyRole = if (isAdult) "PAI" else "FILHO",
+                familyRole = when {
+                    joining && desiredHierarchy.isNotBlank() -> desiredHierarchy.uppercase()
+                    isAdult -> "PAI"
+                    else -> "FILHO"
+                },
                 loginIdentifier = loginIdentifier,
-                profileStatus = "ATIVO",
+                // Quem entra numa família fica aguardando aprovação dos pais dela.
+                profileStatus = if (joining) "PENDENTE_APROVACAO" else "ATIVO",
                 familyCode = resolvedFamilyCode,
                 parentPin = if (pin.isNotBlank()) pin else current.parentPin,
                 spouseName = spouseName.ifEmpty { current.spouseName },
                 spouseContact = spouseContact.ifEmpty { current.spouseContact },
-                isSpouseLinked = isAdult && spouseName.isNotBlank(),
-                isAutonomousChild = isAutonomousChild && !isAdult,
-                monitoringEnabled = isAdult,
+                isSpouseLinked = isAdult && !joining && spouseName.isNotBlank(),
+                isAutonomousChild = isAutonomousChild && !isAdult && !joining,
+                monitoringEnabled = isAdult && !joining,
                 funnyFilterEnabled = !isAdult
             )
 
             repository.insertProfile(updated)
+
+            if (joining) {
+                // Notifica dentro do app: a família-alvo ainda não sabe — o convite
+                // real cruza dispositivos via Supabase quando a sync estiver ativa.
+                showRegistrationDialog.value = false
+                _currentRole.value = if (isAdult) AppRole.PARENT else AppRole.CHILD
+                withdrawalFeedbackMessage.value = "📨 Pedido enviado! Aguarde a aprovação dos responsáveis da família $resolvedFamilyCode."
+                return@launch
+            }
 
             // Se for cadastro adulto e tiver cônjuge, cadastra o contato da Mãe
             if (isAdult && spouseName.isNotBlank()) {

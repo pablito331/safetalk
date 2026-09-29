@@ -962,22 +962,28 @@ fun ParentMonitoringAndPrivacyView(
                                 )
                             }
 
-                            Spacer(modifier = Modifier.height(14.dp))
-
-                            // Código Familiar da Casa para convite
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(Color(0xFFF1F5F9))
-                                    .padding(10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Column {
-                                    Text("Código Familiar da Casa (para o celular da esposa/filhos)", fontSize = 10.sp, color = Color(0xFF64748B))
-                                    Text(familyCode, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = SafeTalkPrimary)
-                                }
+                            Spacer(modifier = Modifier.height(14.dp))                             // Código Familiar da Casa para convite
+                             Row(
+                                 modifier = Modifier
+                                     .fillMaxWidth()
+                                     .clip(RoundedCornerShape(12.dp))
+                                     .background(Color(0xFFF1F5F9))
+                                     .padding(10.dp),
+                                 verticalAlignment = Alignment.CenterVertically,
+                                 horizontalArrangement = Arrangement.SpaceBetween
+                             ) {
+                                 Column {
+                                     Text("Código Familiar da Casa (para o celular da esposa/filhos)", fontSize = 10.sp, color = Color(0xFF64748B))
+                                     Text(familyCode, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = SafeTalkPrimary)
+                                     if (familyCode.isNotBlank()) {
+                                         Spacer(modifier = Modifier.height(4.dp))
+                                         Text(
+                                             "Seu @usuário p/ outras famílias: ${com.example.util.SafeTalkHandle.generate(profile?.name ?: "", familyCode)}",
+                                             fontSize = 10.sp,
+                                             color = Color(0xFF475569)
+                                         )
+                                     }
+                                 }
 
                                 IconButton(
                                     onClick = {

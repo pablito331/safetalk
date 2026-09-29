@@ -133,7 +133,7 @@ fun FamilySafeApp(viewModel: FamilySafeViewModel) {
                         initialSpouseName = "",
                         initialSpouseContact = "",
                         onDismiss = { viewModel.showRegistrationDialog.value = false },
-                        onSave = { name, age, login, isEmail, pin, spouseName, spouseContact, familyCode, isAutonomous ->
+                        onSave = { name, age, login, isEmail, pin, spouseName, spouseContact, familyCode, isAutonomous, joinFamily, desiredHierarchy ->
                             viewModel.registerUser(
                                 name = name,
                                 age = age,
@@ -143,7 +143,9 @@ fun FamilySafeApp(viewModel: FamilySafeViewModel) {
                                 spouseName = spouseName,
                                 spouseContact = spouseContact,
                                 familyCode = familyCode,
-                                isAutonomousChild = isAutonomous
+                                isAutonomousChild = isAutonomous,
+                                joinFamily = joinFamily,
+                                desiredHierarchy = desiredHierarchy
                             )
                         }
                     )
@@ -316,7 +318,7 @@ fun FamilySafeApp(viewModel: FamilySafeViewModel) {
                     initialSpouseName = profile.spouseName,
                     initialSpouseContact = profile.spouseContact,
                     onDismiss = { viewModel.showRegistrationDialog.value = false },
-                    onSave = { name, age, login, isEmail, pin, spouseName, spouseContact, familyCode, isAutonomous ->
+                    onSave = { name, age, login, isEmail, pin, spouseName, spouseContact, familyCode, isAutonomous, joinFamily, desiredHierarchy ->
                         viewModel.registerUser(
                             name = name,
                             age = age,
@@ -326,7 +328,9 @@ fun FamilySafeApp(viewModel: FamilySafeViewModel) {
                             spouseName = spouseName,
                             spouseContact = spouseContact,
                             familyCode = familyCode,
-                            isAutonomousChild = isAutonomous
+                            isAutonomousChild = isAutonomous,
+                            joinFamily = joinFamily,
+                            desiredHierarchy = desiredHierarchy
                         )
                     }
                 )

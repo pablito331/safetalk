@@ -21,9 +21,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -115,6 +119,11 @@ fun ChatDetailScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
+            // Empurra o conteúdo para cima quando o teclado abre, mantendo os
+            // botões de navegação do Android (voltar/home/recents) acessíveis.
+            .statusBarsPadding()
+            .imePadding()
+            .navigationBarsPadding()
             .background(WhatsAppChatBackground)
     ) {
         // WhatsApp style Top Bar
@@ -918,7 +927,8 @@ fun ChatMessageBubble(
                 bottomEnd = if (isMe) 2.dp else 12.dp
             ),
             shadowElevation = 1.dp,
-            modifier = Modifier.fillMaxWidth(0.82f)
+            // Em telas grandes o balão não estica: máx 82% OU 420dp, o que for menor.
+            modifier = Modifier.fillMaxWidth(0.82f).widthIn(max = 420.dp)
         ) {
             Column(modifier = Modifier.padding(8.dp)) {
 
