@@ -36,6 +36,8 @@ import java.util.Locale
 import com.example.util.AppUpdateInfo
 import com.example.util.GitHubUpdateManager
 import android.content.Context
+import com.example.data.supabase.SupabaseAuthService
+import com.example.data.supabase.AuthResult
 
 enum class AppRole {
     PARENT,
@@ -984,16 +986,80 @@ class FamilySafeViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    private val authService = SupabaseAuthService()
+
     fun linkSpouse(spouseName: String, spouseContact: String) {
+        updateSpouseData(spouseName, spouseContact)
+    }
+
+    fun updateSpouseData(spouseName: String, spouseContact: String) {
         val current = childProfile.value ?: return
         viewModelScope.launch {
+            val isLinked = spouseName.isNotBlank()
             repository.updateProfile(
                 current.copy(
                     spouseName = spouseName,
                     spouseContact = spouseContact,
-                    isSpouseLinked = true
+                    isSpouseLinked = isLinked
                 )
             )
+
+            // Atualiza ou insere o contato da Mãe/Esposa para os filhos e família
+            if (spouseName.isNotBlank()) {
+                val currentContacts = contacts.value
+                val momContact = currentContacts.find {
+                    it.relationship.equals("Mãe", ignoreCase = true) ||
+                    it.relationship.equals("Esposa", ignoreCase = true) ||
+                    it.relationship.equals("Cônjuge", ignoreCase = true) ||
+                    it.id == 1L
+                }
+
+                val formattedName = if (spouseName.contains("Mãe", ignoreCase = true)) spouseName else "Mãe ($spouseName)"
+
+                if (momContact != null) {
+                    repository.approveContact(
+                        momContact.copy(
+                            name = formattedName,
+                            phone = spouseContact.ifBlank { momContact.phone },
+                            relationship = "Mãe",
+                            relationshipType = "FAMILY",
+                            isApprovedByParent = true,
+                            safetyStatus = "APROVADO"
+                        )
+                    )
+                } else {
+                    repository.addContact(
+                        ContactEntity(
+                            id = 1L,
+                            name = formattedName,
+                            phone = spouseContact,
+                            relationship = "Mãe",
+                            relationshipType = "FAMILY",
+                            isApprovedByParent = true,
+                            safetyStatus = "APROVADO",
+                            isOnline = true,
+                            lastSeen = "Online",
+                            avatarColor = 0xFF0D9488
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    fun validateAndLinkSpouseEmail(spouseName: String, spouseEmail: String, onResult: (String) -> Unit = {}) {
+        viewModelScope.launch {
+            updateSpouseData(spouseName, spouseEmail)
+            if (spouseEmail.contains("@")) {
+                val result = authService.sendEmailValidation(spouseEmail)
+                val msg = when (result) {
+                    is AuthResult.Success -> result.message
+                    is AuthResult.Error -> result.errorMessage
+                }
+                onResult(msg)
+            } else {
+                onResult("Dados da esposa salvos com sucesso na família!")
+            }
         }
     }
 
@@ -1063,6 +1129,36 @@ class FamilySafeViewModel(application: Application) : AndroidViewModel(applicati
             )
 
             repository.insertProfile(updated)
+
+            // Se for cadastro adulto e tiver cônjuge, cadastra o contato da Mãe
+            if (isAdult && spouseName.isNotBlank()) {
+                val formattedName = if (spouseName.contains("Mãe", ignoreCase = true)) spouseName else "Mãe ($spouseName)"
+                val currentContacts = contacts.value
+                val existingMom = currentContacts.find { it.id == 1L || it.relationship.equals("Mãe", true) }
+                if (existingMom != null) {
+                    repository.approveContact(
+                        existingMom.copy(
+                            name = formattedName,
+                            phone = spouseContact.ifBlank { existingMom.phone }
+                        )
+                    )
+                } else {
+                    repository.addContact(
+                        ContactEntity(
+                            id = 1L,
+                            name = formattedName,
+                            phone = spouseContact,
+                            relationship = "Mãe",
+                            relationshipType = "FAMILY",
+                            isApprovedByParent = true,
+                            safetyStatus = "APROVADO",
+                            isOnline = true,
+                            lastSeen = "Online",
+                            avatarColor = 0xFF0D9488
+                        )
+                    )
+                }
+            }
 
             if (isAdult) {
                 _currentRole.value = AppRole.PARENT

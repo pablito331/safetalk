@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.FamilyRestroom
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
@@ -817,8 +818,12 @@ fun ParentMonitoringAndPrivacyView(
                     }
                 }
 
-                // 5. CÔNJUGE & CÓDIGO FAMILIAR
+                // 5. CÔNJUGE (ESPOSA / MÃE DA FAMÍLIA) & CÓDIGO DA CASA
                 item {
+                    var editableSpouseName by remember(profile?.spouseName) { mutableStateOf(profile?.spouseName.orEmpty()) }
+                    var editableSpouseContact by remember(profile?.spouseContact) { mutableStateOf(profile?.spouseContact.orEmpty()) }
+                    var savedFeedback by remember { mutableStateOf(false) }
+
                     Card(
                         colors = CardDefaults.cardColors(containerColor = Color(0xFFF8FAFC)),
                         shape = RoundedCornerShape(16.dp),
@@ -827,24 +832,145 @@ fun ParentMonitoringAndPrivacyView(
                             .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(16.dp))
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    Icons.Default.FamilyRestroom,
-                                    contentDescription = null,
-                                    tint = SafeTalkPrimary,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Cônjuge & Código da Casa",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp,
-                                    color = SafeTalkDark
-                                )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.FamilyRestroom,
+                                        contentDescription = null,
+                                        tint = SafeTalkPrimary,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            text = "Esposa / Mãe da Família",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 15.sp,
+                                            color = SafeTalkDark
+                                        )
+                                        Text(
+                                            text = if (isSpouseLinked && editableSpouseName.isNotBlank()) "Vinculada aos chats da família" else "Cadastre sua esposa para supervisão conjunta",
+                                            fontSize = 11.sp,
+                                            color = if (isSpouseLinked && editableSpouseName.isNotBlank()) SafeTalkSuccess else Color(0xFF64748B)
+                                        )
+                                    }
+                                }
+
+                                if (isSpouseLinked && editableSpouseName.isNotBlank()) {
+                                    Surface(
+                                        color = SafeTalkSuccess.copy(alpha = 0.15f),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Text(
+                                            text = "Ativa",
+                                            color = SafeTalkSuccess,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        )
+                                    }
+                                }
                             }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            OutlinedTextField(
+                                value = editableSpouseName,
+                                onValueChange = {
+                                    editableSpouseName = it
+                                    savedFeedback = false
+                                },
+                                label = { Text("Nome da Esposa / Mãe") },
+                                placeholder = { Text("Ex: Juliana, Ana, Maria...") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Person, contentDescription = null, tint = SafeTalkPrimary)
+                                },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = SafeTalkPrimary,
+                                    focusedLabelColor = SafeTalkPrimary,
+                                    unfocusedBorderColor = Color(0xFFCBD5E1),
+                                    unfocusedLabelColor = Color(0xFF64748B),
+                                    focusedTextColor = Color(0xFF0F172A),
+                                    unfocusedTextColor = Color(0xFF0F172A),
+                                    cursorColor = SafeTalkPrimary,
+                                    focusedContainerColor = Color.White,
+                                    unfocusedContainerColor = Color.White
+                                )
+                            )
 
                             Spacer(modifier = Modifier.height(10.dp))
 
+                            OutlinedTextField(
+                                value = editableSpouseContact,
+                                onValueChange = {
+                                    editableSpouseContact = it
+                                    savedFeedback = false
+                                },
+                                label = { Text("E-mail da Esposa (para login e supervisão)") },
+                                placeholder = { Text("ex: esposa@gmail.com") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Email, contentDescription = null, tint = SafeTalkPrimary)
+                                },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = SafeTalkPrimary,
+                                    focusedLabelColor = SafeTalkPrimary,
+                                    unfocusedBorderColor = Color(0xFFCBD5E1),
+                                    unfocusedLabelColor = Color(0xFF64748B),
+                                    focusedTextColor = Color(0xFF0F172A),
+                                    unfocusedTextColor = Color(0xFF0F172A),
+                                    cursorColor = SafeTalkPrimary,
+                                    focusedContainerColor = Color.White,
+                                    unfocusedContainerColor = Color.White
+                                )
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            var authFeedbackMessage by remember { mutableStateOf<String?>(null) }
+
+                            Button(
+                                onClick = {
+                                    viewModel.validateAndLinkSpouseEmail(
+                                        spouseName = editableSpouseName.trim(),
+                                        spouseEmail = editableSpouseContact.trim()
+                                    ) { feedback ->
+                                        authFeedbackMessage = feedback
+                                        savedFeedback = true
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = SafeTalkPrimary),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.Email, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (isSpouseLinked) "Atualizar & Validar E-mail (Supabase)" else "Vincular & Enviar Convite por E-mail",
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            if (savedFeedback && authFeedbackMessage != null) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "✉️ ${authFeedbackMessage}",
+                                    color = SafeTalkSuccess,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            // Código Familiar da Casa para convite
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -855,7 +981,7 @@ fun ParentMonitoringAndPrivacyView(
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Column {
-                                    Text("Código Familiar da Casa", fontSize = 10.sp, color = Color(0xFF64748B))
+                                    Text("Código Familiar da Casa (para o celular da esposa/filhos)", fontSize = 10.sp, color = Color(0xFF64748B))
                                     Text(familyCode, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = SafeTalkPrimary)
                                 }
 

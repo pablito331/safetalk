@@ -102,7 +102,7 @@ abstract class AppDatabase : RoomDatabase() {
             val initialContacts = listOf(
                 ContactEntity(
                     id = 1L,
-                    name = "Mãe (Juliana)",
+                    name = "Mãe",
                     phone = "(11) 98888-1111",
                     relationship = "Mãe",
                     isApprovedByParent = true,
@@ -272,7 +272,7 @@ abstract class AppDatabase : RoomDatabase() {
             // Destaques / Stories da Família
             val initialHighlights = listOf(
                 FamilyHighlightEntity(
-                    authorName = "Mãe (Juliana)",
+                    authorName = "Mãe",
                     authorRole = "PARENT",
                     avatarDrawableResName = "avatar_mae",
                     title = "Passeio de Domingo no Parque 🌳",
