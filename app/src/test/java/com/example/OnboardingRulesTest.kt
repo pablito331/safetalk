@@ -31,4 +31,16 @@ class OnboardingRulesTest {
         assertTrue(OnboardingRules.matchesFamilyCode("FAM-1234", "1234"))
         assertFalse(OnboardingRules.matchesFamilyCode("FAM-9999", "FAM-1234"))
     }
+
+    @Test
+    fun generatedFamilyCodeIsStrongAndUnique() {
+        val codes = (1..50).map { OnboardingRules.generateFamilyCode() }
+        codes.forEach { code ->
+            assertTrue(code.startsWith("FAM-"))
+            val body = code.removePrefix("FAM-")
+            assertEquals(8, body.length)
+            assertTrue(body.all { it in "ABCDEFGHJKLMNPQRSTUVWXYZ23456789" })
+        }
+        assertEquals(50, codes.toSet().size) // sem colisão em 50 gerações
+    }
 }

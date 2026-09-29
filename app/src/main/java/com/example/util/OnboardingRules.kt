@@ -30,8 +30,18 @@ object OnboardingRules {
         return normalizedInput.isNotBlank() && normalizedInput == normalizedExpected
     }
 
+    /**
+     * Gera um código familiar forte e praticamente único (ex: FAM-7K4Q9X2M).
+     * 8 caracteres de um alfabeto sem dígitos ambíguos → 32^8 ≈ 1,1 trilhão de
+     * combinações; colisão entre famílias é improvável e cada família também
+     * confere o nome de quem entra, então um choque acidental não dá acesso à
+     * conversa.
+     */
     fun generateFamilyCode(): String {
-        val random = (1000..9999).random()
-        return "FAM-$random"
+        val alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789" // sem I, O, 0, 1 (ambíguos)
+        val code = buildString {
+            repeat(8) { append(alphabet.random()) }
+        }
+        return "FAM-$code"
     }
 }

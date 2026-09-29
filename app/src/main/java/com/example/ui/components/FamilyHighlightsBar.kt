@@ -1,6 +1,5 @@
 package com.example.ui.components
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -32,21 +31,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.R
 import com.example.data.model.FamilyHighlightEntity
 import com.example.ui.theme.WhatsAppDarkTeal
 
 @Composable
 fun FamilyHighlightsBar(
     highlights: List<FamilyHighlightEntity>,
-    currentUserAvatarRes: Int = R.drawable.avatar_pedro,
+    currentUserName: String = "",
     onAddNewHighlight: () -> Unit,
     onOpenHighlight: (FamilyHighlightEntity) -> Unit,
     modifier: Modifier = Modifier
@@ -101,7 +97,7 @@ fun FamilyHighlightsBar(
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Add new Story / Highlight button
+                // Botão "Criar" — iniciais do usuário real, sem avatar mockado
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
@@ -115,11 +111,11 @@ fun FamilyHighlightsBar(
                             .background(Color(0xFFE2E8F0)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Image(
-                            painter = painterResource(id = currentUserAvatarRes),
-                            contentDescription = "Meu avatar",
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
+                        Text(
+                            text = currentUserName.trim().take(2).uppercase().ifBlank { "ST" },
+                            color = WhatsAppDarkTeal,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
                         )
                         Surface(
                             shape = CircleShape,
@@ -145,10 +141,8 @@ fun FamilyHighlightsBar(
                     )
                 }
 
-                // List of active highlights / stories
+                // Stories da família — iniciais de quem publicou
                 highlights.forEach { highlight ->
-                    val avatarRes = R.drawable.avatar_pedro
-
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier
@@ -168,14 +162,15 @@ fun FamilyHighlightsBar(
                                 )
                                 .padding(2.5.dp)
                                 .clip(CircleShape)
+                                .background(Color(0xFF0F5142)),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Image(
-                                painter = painterResource(id = avatarRes),
-                                contentDescription = highlight.authorName,
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
+                            Text(
+                                text = highlight.authorName.trim().take(2).uppercase().ifBlank { "ST" },
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
                             )
-                            // Mood Emoji badge
                             Surface(
                                 shape = CircleShape,
                                 color = Color.White,
@@ -191,7 +186,8 @@ fun FamilyHighlightsBar(
                         }
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = highlight.authorName.split(" ").firstOrNull() ?: highlight.authorName,
+                            text = highlight.authorName.split(" ").firstOrNull()?.ifBlank { null }
+                                ?: "Família",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,

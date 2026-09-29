@@ -134,12 +134,18 @@ fun ChildModeScreen(
                                     contentScale = ContentScale.Crop
                                 )
                             } else {
-                                Image(
-                                    painter = painterResource(id = R.drawable.avatar_pedro),
-                                    contentDescription = "Foto de ${profile.name}",
+                                // Iniciais do nome real da criança — sem avatar mockado.
+                                Box(
                                     modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop
-                                )
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = profile.name.trim().take(2).uppercase().ifBlank { "ST" },
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 15.sp
+                                    )
+                                }
                             }
                         }
                         Spacer(modifier = Modifier.width(10.dp))
@@ -204,6 +210,7 @@ fun ChildModeScreen(
                         contacts = approvedContacts,
                         highlights = highlights,
                         viewModel = viewModel,
+                        currentUserName = profile.name,
                         onRequestFriendClick = { viewModel.showInviteParentsDialog.value = true },
                         onOpenChat = { viewModel.openChat(it) }
                     )
@@ -298,6 +305,7 @@ fun ChildChatsView(
     contacts: List<ContactEntity>,
     highlights: List<FamilyHighlightEntity>,
     viewModel: FamilySafeViewModel,
+    currentUserName: String,
     onRequestFriendClick: () -> Unit,
     onOpenChat: (Long) -> Unit
 ) {
@@ -311,7 +319,7 @@ fun ChildChatsView(
         item {
             FamilyHighlightsBar(
                 highlights = highlights,
-                currentUserAvatarRes = R.drawable.avatar_pedro,
+                currentUserName = currentUserName,
                 onAddNewHighlight = { viewModel.showCreateHighlightDialog.value = true },
                 onOpenHighlight = { viewModel.selectedHighlight.value = it }
             )
@@ -426,14 +434,8 @@ fun ChildChatsView(
                                     ),
                                 contentAlignment = Alignment.Center
                             ) {
-                                if (contact.name.contains("Pedro", ignoreCase = true)) {
-                                    Image(
-                                        painter = painterResource(id = R.drawable.avatar_pedro),
-                                        contentDescription = contact.name,
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                } else {
+                                // Avatares são sempre as iniciais do nome real — sem imagens mockadas.
+                                run {
                                     val initials = contact.name.trim().take(2).uppercase()
                                     Text(
                                         text = initials,

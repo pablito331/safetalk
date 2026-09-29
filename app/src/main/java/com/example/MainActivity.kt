@@ -184,8 +184,9 @@ fun FamilySafeApp(viewModel: FamilySafeViewModel) {
             }
 
             if (showCreateTask) {
+                val childNames = siblingAccounts.map { it.name } + profile.name
                 CreateTaskDialog(
-                    availableChildren = listOf(profile.name, "Mariana", "Lucas", "Todos os Filhos").distinct(),
+                    availableChildren = childNames.distinct(),
                     onDismiss = { viewModel.showCreateTaskDialog.value = false },
                     onConfirm = { title, desc, reward, pts, cat, due, assignedChild, penaltyAmount, requiresPhotoEvidence, recurrence ->
                         viewModel.createNewTask(title, desc, reward, pts, cat, due, assignedChild, penaltyAmount, requiresPhotoEvidence, recurrence)
@@ -233,8 +234,9 @@ fun FamilySafeApp(viewModel: FamilySafeViewModel) {
             }
 
             if (showDirectDebtPaid) {
+                val childNames = siblingAccounts.map { it.name } + profile.name
                 DirectDebtPaidDialog(
-                    children = listOf("Pedro", "Mariana", "Lucas"),
+                    children = childNames.distinct(),
                     currentChildBalance = profile.balance,
                     onDismiss = { viewModel.showDirectDebtPaidDialog.value = false },
                     onConfirmDebtPaid = { childName, amount, reason ->
@@ -281,8 +283,8 @@ fun FamilySafeApp(viewModel: FamilySafeViewModel) {
 
             if (showInviteParents) {
                 InviteParentsDialog(
-                    familyCode = "FAM-7749",
-                    childName = profile.name.ifEmpty { "Mariana" },
+                    familyCode = profile.familyCode.ifEmpty { "" },
+                    childName = profile.name,
                     onDismiss = { viewModel.showInviteParentsDialog.value = false },
                     onTakeOverControl = { parentName, pin ->
                         viewModel.linkParentToFriendAccount(parentName, pin)

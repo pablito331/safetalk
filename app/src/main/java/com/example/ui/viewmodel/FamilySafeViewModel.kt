@@ -599,7 +599,7 @@ class FamilySafeViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     // Check if child has any pending tasks blocking withdrawal
-    fun hasPendingTasksForChild(childName: String = "Pedro"): Boolean {
+    fun hasPendingTasksForChild(childName: String): Boolean {
         val currentTasks = tasks.value
         return currentTasks.any { task ->
             task.status == "PENDENTE" && (task.assignedChildName.equals(childName, ignoreCase = true) || task.assignedChildName.equals("Todos os Filhos", ignoreCase = true) || task.assignedChildName.equals("Todos", ignoreCase = true))
@@ -687,7 +687,7 @@ class FamilySafeViewModel(application: Application) : AndroidViewModel(applicati
 
     // Task Transfer between siblings workflow
     fun requestTaskTransfer(task: FamilyTaskEntity, targetSibling: String) {
-        val currentChild = childProfile.value?.name ?: "Pedro"
+        val currentChild = childProfile.value?.name ?: return
         viewModelScope.launch {
             repository.requestTaskTransfer(task, targetSibling, currentChild)
             taskToTransferToSibling.value = null
@@ -746,7 +746,7 @@ class FamilySafeViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     // Highlights / Stories ("Manchetes & Destaques da Família")
-    fun requestGroupCreation(groupName: String, description: String = "", creatorName: String = "Pedro", creatorRole: String = "CHILD") {
+    fun requestGroupCreation(groupName: String, description: String = "", creatorName: String, creatorRole: String = "CHILD") {
         if (groupName.isBlank()) return
         viewModelScope.launch {
             repository.requestGroupCreation(
@@ -813,16 +813,12 @@ class FamilySafeViewModel(application: Application) : AndroidViewModel(applicati
         photoBase64: String? = null
     ) {
         viewModelScope.launch {
-            val avatarRes = when {
-                authorName.contains("Mãe", ignoreCase = true) || authorName.contains("Juliana", ignoreCase = true) -> "avatar_mae"
-                authorName.contains("Mariana", ignoreCase = true) -> "avatar_mariana"
-                else -> "avatar_pedro"
-            }
+            // Avatares são renderizados como iniciais; nenhum recurso mockado é gravado.
             repository.addHighlight(
                 FamilyHighlightEntity(
                     authorName = authorName,
                     authorRole = authorRole,
-                    avatarDrawableResName = avatarRes,
+                    avatarDrawableResName = "",
                     title = title,
                     textContent = textContent,
                     audience = audience,

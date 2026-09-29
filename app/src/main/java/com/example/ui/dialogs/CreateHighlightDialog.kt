@@ -51,7 +51,7 @@ import com.example.ui.theme.WhatsAppDarkTeal
 
 @Composable
 fun CreateHighlightDialog(
-    currentUserName: String = "Pedro",
+    currentUserName: String = "",
     currentUserRole: String = "CHILD",
     onDismiss: () -> Unit,
     onPublish: (title: String, text: String, emoji: String, hasPhoto: Boolean, audience: String) -> Unit

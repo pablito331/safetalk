@@ -218,6 +218,7 @@ fun ParentDashboardScreen(
                         contacts = contacts,
                         highlights = highlights,
                         viewModel = viewModel,
+                        currentUserName = profile.name,
                         onOpenChat = { viewModel.openChat(it) }
                     )
                 }
@@ -264,14 +265,14 @@ fun ParentDashboardScreen(
     // Dialog: Create Highlight / Story by Parent
     if (showCreateHighlight) {
         CreateHighlightDialog(
-            currentUserName = "Mãe (Mariana)",
+            currentUserName = profile.name,   // responsável logado, sem nome mockado
             currentUserRole = "PARENT",
             onDismiss = { viewModel.showCreateHighlightDialog.value = false },
             onPublish = { title, text, emoji, hasPhoto, audience ->
                 viewModel.addHighlight(
                     title = title,
                     textContent = text,
-                    authorName = "Mãe (Mariana)",
+                    authorName = profile.name,   // autor real, sem nome mockado
                     authorRole = "PARENT",
                     moodEmoji = emoji,
                     audience = audience,
@@ -299,6 +300,7 @@ fun ParentConversationsView(
     contacts: List<ContactEntity>,
     highlights: List<FamilyHighlightEntity> = emptyList(),
     viewModel: FamilySafeViewModel,
+    currentUserName: String,
     onOpenChat: (Long) -> Unit
 ) {
     LazyColumn(
@@ -311,7 +313,7 @@ fun ParentConversationsView(
         item {
             FamilyHighlightsBar(
                 highlights = highlights,
-                currentUserAvatarRes = R.drawable.avatar_pedro,
+                currentUserName = currentUserName,
                 onAddNewHighlight = { viewModel.showCreateHighlightDialog.value = true },
                 onOpenHighlight = { viewModel.selectedHighlight.value = it }
             )
@@ -380,15 +382,8 @@ fun ParentConversationsView(
                                     }
                                 ),
                             contentAlignment = Alignment.Center
-                        ) {
-                            if (contact.name.contains("Pedro", ignoreCase = true)) {
-                                Image(
-                                    painter = painterResource(id = R.drawable.avatar_pedro),
-                                    contentDescription = contact.name,
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop
-                                )
-                            } else {
+                        ) {                            // Avatares são sempre as iniciais do nome real — sem imagens mockadas.
+                            run {
                                 val initials = contact.name.trim().take(2).uppercase()
                                 Text(
                                     text = initials,

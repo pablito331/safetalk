@@ -74,7 +74,8 @@ fun HighlightStoryViewerDialog(
         onDismiss()
     }
 
-    val avatarRes = R.drawable.avatar_pedro
+    // Avatar do autor do story: iniciais do nome real, sem imagem mockada.
+    val authorInitials = highlight.authorName.trim().take(2).uppercase().ifBlank { "ST" }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -114,14 +115,20 @@ fun HighlightStoryViewerDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Image(
-                            painter = painterResource(id = avatarRes),
-                            contentDescription = highlight.authorName,
+                        Box(
                             modifier = Modifier
                                 .size(42.dp)
-                                .clip(CircleShape),
-                            contentScale = ContentScale.Crop
-                        )
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = authorInitials,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                        }
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
                             Row(verticalAlignment = Alignment.CenterVertically) {

@@ -8,7 +8,8 @@ data class FamilyHighlightEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val authorName: String,
     val authorRole: String = "CHILD", // "CHILD", "PARENT", "FRIEND"
-    val avatarDrawableResName: String = "avatar_pedro",
+    // Avatares são renderizados como iniciais do nome; campo mantido por compatibilidade de schema.
+    val avatarDrawableResName: String = "",
     val title: String,
     val textContent: String,
     val audience: String = "FAMILY", // "FAMILY", "ALL_CONTACTS"

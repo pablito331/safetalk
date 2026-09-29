@@ -51,13 +51,13 @@ import com.example.ui.theme.SafeTalkSuccess
 @Composable
 fun TransferTaskDialog(
     task: FamilyTaskEntity,
-    currentChildName: String = "Pedro",
-    availableSiblings: List<String> = listOf("Mariana", "Lucas"),
+    currentChildName: String,
+    availableSiblings: List<String> = emptyList(),
     onDismiss: () -> Unit,
     onConfirmTransferRequest: (targetSibling: String) -> Unit
 ) {
     val eligibleSiblings = availableSiblings.filter { !it.equals(currentChildName, ignoreCase = true) }
-    var selectedSibling by remember { mutableStateOf(eligibleSiblings.firstOrNull() ?: "Mariana") }
+    var selectedSibling by remember { mutableStateOf(eligibleSiblings.firstOrNull() ?: "") }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(

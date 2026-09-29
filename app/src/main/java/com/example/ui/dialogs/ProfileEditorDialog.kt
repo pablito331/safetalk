@@ -50,7 +50,7 @@ import com.example.ui.theme.SafeTalkPrimaryContainer
 
 @Composable
 fun ProfileEditorDialog(
-    initialName: String = "Pedro",
+    initialName: String = "",
     initialRole: String = "FILHO",
     initialStatus: String = "ATIVO",
     initialPhotoUri: String? = null,

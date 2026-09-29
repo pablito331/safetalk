@@ -60,8 +60,8 @@ import com.example.ui.theme.WhatsAppDarkTeal
 
 @Composable
 fun InviteParentsDialog(
-    familyCode: String = "FAM-7749",
-    childName: String = "Mariana",
+    familyCode: String = "",
+    childName: String = "",
     onDismiss: () -> Unit,
     onTakeOverControl: (parentName: String, pin: String) -> Unit
 ) {

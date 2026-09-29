@@ -53,7 +53,7 @@ import com.example.ui.theme.SafeTalkPrimary
 
 @Composable
 fun TransferMoneyDialog(
-    senderName: String = "Pedro",
+    senderName: String = "",
     senderBalance: Double,
     availableSiblings: List<SiblingAccountEntity>,
     onDismiss: () -> Unit,

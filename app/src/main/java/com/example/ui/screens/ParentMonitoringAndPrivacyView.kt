@@ -106,10 +106,11 @@ fun ParentMonitoringAndPrivacyView(
 
     val isMonitoring = profile?.monitoringEnabled ?: true
     val isFunnyFilter = profile?.funnyFilterEnabled ?: true
-    val spouseName = profile?.spouseName ?: "Ana (Mãe)"
-    val spouseContact = profile?.spouseContact ?: "(11) 98765-4321"
-    val isSpouseLinked = profile?.isSpouseLinked ?: true
-    val familyCode = profile?.familyCode ?: "FAM-7749"
+    // Sem fallbacks mockados: quando o dado real não existe, exibimos estado vazio honesto.
+    val spouseName = profile?.spouseName ?: ""
+    val spouseContact = profile?.spouseContact ?: ""
+    val isSpouseLinked = profile?.isSpouseLinked ?: false
+    val familyCode = profile?.familyCode ?: ""
 
     var selectedSubTab by remember { mutableIntStateOf(0) }
     var testInputText by remember { mutableStateOf("") }
@@ -212,7 +213,7 @@ fun ParentMonitoringAndPrivacyView(
                 item {
                     FamilyHighlightsBar(
                         highlights = highlights,
-                        currentUserAvatarRes = R.drawable.avatar_pedro,
+                        currentUserName = profile?.name ?: "",
                         onAddNewHighlight = { viewModel.showCreateHighlightDialog.value = true },
                         onOpenHighlight = { viewModel.selectedHighlight.value = it }
                     )
@@ -436,15 +437,8 @@ fun ParentMonitoringAndPrivacyView(
                                                 }
                                             ),
                                         contentAlignment = Alignment.Center
-                                    ) {
-                                        if (contact.name.contains("Pedro", ignoreCase = true)) {
-                                            Image(
-                                                painter = painterResource(id = R.drawable.avatar_pedro),
-                                                contentDescription = contact.name,
-                                                modifier = Modifier.fillMaxSize(),
-                                                contentScale = ContentScale.Crop
-                                            )
-                                        } else {
+                                    ) {                                        // Avatares são sempre as iniciais do nome real — sem imagens mockadas.
+                                        run {
                                             val initials = contact.name.trim().take(2).uppercase()
                                             Text(
                                                 text = initials,
