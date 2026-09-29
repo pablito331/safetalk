@@ -69,14 +69,16 @@ jobs:
         run: |
           ./gradlew assembleRelease \
             -PappVersionName=${{ steps.version.outputs.version_name }} \
-            -PappVersionCode=${{ steps.version.outputs.version_code }}
+            -PappVersionCode=${{ steps.version.outputs.version_code }} \
+            -Pkotlin.compiler.execution.strategy=daemon
 
       - name: Build Debug APK (fallback)
         if: ${{ steps.keystore.outputs.available != 'true' }}
         run: |
           ./gradlew assembleDebug \
             -PappVersionName=${{ steps.version.outputs.version_name }} \
-            -PappVersionCode=${{ steps.version.outputs.version_code }}
+            -PappVersionCode=${{ steps.version.outputs.version_code }} \
+            -Pkotlin.compiler.execution.strategy=daemon
 
       - name: Prepare APK Artifact
         run: |
