@@ -194,6 +194,17 @@ class FamilySafeViewModel(application: Application) : AndroidViewModel(applicati
         viewModelScope.launch {
             childProfile.collect { profile ->
                 showRegistrationDialog.value = profile == null
+                // Restaura o papel salvo no perfil: reabrir o app volta para a
+                // mesma tela (pais/filho/amigo) em vez de um default fixo.
+                if (profile != null && profile.persistedRole.isNotBlank()) {
+                    val restored = when (profile.persistedRole.uppercase()) {
+                        "PARENT" -> AppRole.PARENT
+                        "CHILD" -> AppRole.CHILD
+                        "FRIEND_SIMPLIFIED" -> AppRole.FRIEND_SIMPLIFIED
+                        else -> null
+                    }
+                    if (restored != null) _currentRole.value = restored
+                }
             }
         }
         checkForAppUpdates()
@@ -357,7 +368,8 @@ class FamilySafeViewModel(application: Application) : AndroidViewModel(applicati
                     familyCode = expectedCode,
                     monitoringEnabled = false,
                     funnyFilterEnabled = true,
-                    profileStatus = "ATIVO"
+                    profileStatus = "ATIVO",
+                    persistedRole = AppRole.CHILD.name
                 )
             )
             familyJoinMessage.value = "Você entrou na família com sucesso. Aguardando sincronização dos responsáveis."
@@ -372,6 +384,14 @@ class FamilySafeViewModel(application: Application) : AndroidViewModel(applicati
         _currentRole.value = role
         if (role != AppRole.PARENT) {
             isParentReviewModeActive.value = false
+        }
+        // Persiste o papel para restaurar a tela correta no próximo abrir do app.
+        viewModelScope.launch {
+            childProfile.value?.let { current ->
+                if (current.persistedRole != role.name) {
+                    repository.updateProfile(current.copy(persistedRole = role.name))
+                }
+            }
         }
     }
 
@@ -425,7 +445,8 @@ class FamilySafeViewModel(application: Application) : AndroidViewModel(applicati
             repository.updateProfile(
                 current.copy(
                     parentPin = pin,
-                    name = friendGuestName.value.replace(" (Amiguinha)", "")
+                    name = friendGuestName.value.replace(" (Amiguinha)", ""),
+                    persistedRole = AppRole.PARENT.name
                 )
             )
             // Send system message in family chat
@@ -1324,11 +1345,25 @@ class FamilySafeViewModel(application: Application) : AndroidViewModel(applicati
         viewModelScope.launch {
             // Criar família: gera código novo. Entrar: usa o código informado e
             // fica PENDENTE até os pais aprovarem e confirmarem a hierarquia.
-            val joining = joinFamily && normalizedCode.isNotBlank()
-            val resolvedFamilyCode = if (joining) {
-                normalizedCode
-            } else {
-                OnboardingRules.generateFamilyCode()
+            // Informou um código? Então está ENTRANDO numa família existente
+            // (o campo de código só aparece para quem quer entrar). Código vazio = criar.
+            // Isso garante que menores com código entrem na família dos pais em vez
+            // de criarem uma própria com o mesmo código.
+            val joining = normalizedCode.isNotBlank()
+            // Só adulto criando família gera código novo. Menor sem código não cria
+            // família: entra como amigo convidado (modo autônomo).
+            val resolvedFamilyCode = when {
+                joining -> normalizedCode
+                isAdult -> OnboardingRules.generateFamilyCode()
+                else -> ""
+            }
+
+            val autonomousOnly = !isAdult && !joining
+
+            val targetRole = when {
+                isAdult -> AppRole.PARENT
+                autonomousOnly || isAutonomousChild -> AppRole.FRIEND_SIMPLIFIED
+                else -> AppRole.CHILD
             }
 
             val updated = current.copy(
@@ -1339,6 +1374,7 @@ class FamilySafeViewModel(application: Application) : AndroidViewModel(applicati
                 familyRole = when {
                     joining && desiredHierarchy.isNotBlank() -> desiredHierarchy.uppercase()
                     isAdult -> "PAI"
+                    autonomousOnly -> "AMIGO"
                     else -> "FILHO"
                 },
                 loginIdentifier = loginIdentifier,
@@ -1349,9 +1385,11 @@ class FamilySafeViewModel(application: Application) : AndroidViewModel(applicati
                 spouseName = spouseName.ifEmpty { current.spouseName },
                 spouseContact = spouseContact.ifEmpty { current.spouseContact },
                 isSpouseLinked = isAdult && !joining && spouseName.isNotBlank(),
-                isAutonomousChild = isAutonomousChild && !isAdult && !joining,
+                isAutonomousChild = autonomousOnly,
                 monitoringEnabled = isAdult && !joining,
-                funnyFilterEnabled = !isAdult
+                funnyFilterEnabled = !isAdult,
+                // Papel já nasce persistido: reabrir o app volta para a tela certa.
+                persistedRole = targetRole.name
             )
 
             repository.insertProfile(updated)
@@ -1360,7 +1398,7 @@ class FamilySafeViewModel(application: Application) : AndroidViewModel(applicati
                 // Notifica dentro do app: a família-alvo ainda não sabe — o convite
                 // real cruza dispositivos via Supabase quando a sync estiver ativa.
                 showRegistrationDialog.value = false
-                _currentRole.value = if (isAdult) AppRole.PARENT else AppRole.CHILD
+                _currentRole.value = targetRole
                 withdrawalFeedbackMessage.value = "📨 Pedido enviado! Aguarde a aprovação dos responsáveis da família $resolvedFamilyCode."
                 return@launch
             }
@@ -1395,13 +1433,7 @@ class FamilySafeViewModel(application: Application) : AndroidViewModel(applicati
                 }
             }
 
-            if (isAdult) {
-                _currentRole.value = AppRole.PARENT
-            } else if (isAutonomousChild) {
-                _currentRole.value = AppRole.FRIEND_SIMPLIFIED
-            } else {
-                _currentRole.value = AppRole.CHILD
-            }
+            _currentRole.value = targetRole
             showRegistrationDialog.value = false
         }
     }

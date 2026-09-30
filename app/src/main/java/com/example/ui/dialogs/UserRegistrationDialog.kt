@@ -91,6 +91,11 @@ fun UserRegistrationDialog(
 
     val age = ageText.toIntOrNull() ?: 0
     val isAdult = age >= 18
+    // Idade é a base do papel no app: sem ela, tudo erra (perfil vazio = 0 anos = criança).
+    val ageInvalid = ageText.isBlank() || age == 0 || age > 120
+    // Menor só entra no app como: amigo convidado (autônomo) ou com o código
+    // da família (fica pendente na aprovação dos pais). Nunca criando família.
+    val minorInvalidCreate = !isAdult && !isAutonomousChild && familyCodeInput.isBlank()
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -300,9 +305,13 @@ fun UserRegistrationDialog(
                     OutlinedTextField(
                         value = ageText,
                         onValueChange = { if (it.length <= 3) ageText = it.filter { char -> char.isDigit() } },
-                        label = { Text("Idade (anos)") },
+                        label = { Text("Idade (anos) *") },
                         leadingIcon = {
                             Icon(Icons.Default.Security, contentDescription = null, tint = SafeTalkPrimary)
+                        },
+                        isError = ageInvalid,
+                        supportingText = {
+                            if (ageInvalid) Text("Informe uma idade válida (1–120)", fontSize = 11.sp)
                         },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -377,6 +386,8 @@ fun UserRegistrationDialog(
                                     )
                                 }
 
+                                // Menor sem modo autônomo entra com o código da família
+                                // (fica PENDENTE até os pais aprovarem).
                                 if (!isAutonomousChild) {
                                     Spacer(modifier = Modifier.height(4.dp))
                                     OutlinedTextField(
@@ -625,8 +636,16 @@ fun UserRegistrationDialog(
                             Text("Cancelar", color = Color(0xFF64748B))
                         }
                         Spacer(modifier = Modifier.width(8.dp))
+                        val registrationInvalid = ageInvalid || minorInvalidCreate
                         Button(
+                            enabled = !registrationInvalid,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isAdult) SafeTalkPrimary else SafeTalkSuccess,
+                                disabledContainerColor = Color(0xFFCBD5E1),
+                                disabledContentColor = Color(0xFF64748B)
+                            ),
                             onClick = {
+                                if (registrationInvalid) return@Button
                                 onSave(
                                     name.ifEmpty { if (isAdult) "Pai (responsável)" else "Meu filho" },
                                     age,
@@ -641,14 +660,15 @@ fun UserRegistrationDialog(
                                     desiredRole
                                 )
                             },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isAdult) SafeTalkPrimary else SafeTalkSuccess
-                            ),
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.testTag("reg_confirm_button")
                         ) {
                             Text(
-                                text = if (isAdult) "Confirmar Modo Pais" else "Entrar no SafeTalk",
+                                text = when {
+                                    minorInvalidCreate -> "Menor: informe o código da família ou marque o modo autônomo"
+                                    isAdult -> "Confirmar Modo Pais"
+                                    else -> "Entrar no SafeTalk"
+                                },
                                 fontWeight = FontWeight.Bold
                             )
                         }

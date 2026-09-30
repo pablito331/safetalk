@@ -33,6 +33,9 @@ data class ChildProfileEntity(
     val spouseName: String = "",
     val spouseContact: String = "",
     val isSpouseLinked: Boolean = false,
-    val isAutonomousChild: Boolean = false
+    val isAutonomousChild: Boolean = false,
+    // Papel da tela salvo (PARENT/CHILD/FRIEND_SIMPLIFIED): reabrir o app volta
+    // para a mesma UI em vez de depender da idade ou de um default.
+    val persistedRole: String = ""
 )
 
