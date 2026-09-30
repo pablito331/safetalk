@@ -64,12 +64,20 @@ class SupabaseSyncService : SupabaseSyncContract {
                 "display_name" to profile.name,
                 "family_code" to profile.familyCode,
                 "role" to role
+                // Nota: family_code = "" significa "ainda sem família" — quando a
+                // pessoa entrar/criar uma família, o upsert substitui pelo código novo.
             )
             // owner_id real = uid do token; o servidor não confia no body.
             // Buscamos o uid do usuário logado:
             val uid = fetchAuthUid(token) ?: return
             val finalPayload = payload + ("owner_id" to uid)
-            client.upsertIdentity(apiKey, "Bearer $token", finalPayload)
+            client.upsertIdentity(
+                apiKey = apiKey,
+                authHeader = "Bearer $token",
+                prefer = "resolution=merge-digest",
+                onConflict = "login_identifier",
+                payload = finalPayload
+            )
         } catch (e: Exception) {
             Log.w("SupabaseSync", "Falha ao registrar identidade: ${e.message}")
         }

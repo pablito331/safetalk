@@ -55,10 +55,15 @@ interface SupabaseRealtimeClient {
     ): List<Map<String, Any?>>
 
     // ---------- Identidade do dispositivo (public.device_identities) ----------
-    @PUT("/rest/v1/device_identities")
+    // POST + on_conflict = UPSERT real: se a identidade já existe
+    // (ex: perfil mudou de "sem família" para família nova), a linha
+    // é ATUALIZADA em vez de falhar em silêncio.
+    @POST("/rest/v1/device_identities")
     suspend fun upsertIdentity(
         @Header("apikey") apiKey: String,
         @Header("Authorization") authHeader: String,
+        @Header("Prefer") prefer: String,
+        @Query("on_conflict") onConflict: String,
         @Body payload: Map<String, Any?>
     ): List<Map<String, Any?>>
 

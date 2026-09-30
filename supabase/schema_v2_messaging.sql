@@ -4,6 +4,10 @@
 -- Rode este script UMA VEZ no Supabase:
 -- Dashboard > SQL Editor > New query > cole tudo > Run.
 --
+-- ✅ Este script é IDEMPOTENTE: pode rodar de novo sem erro
+--    (em execução repetida ele apenas recria policies e ignora
+--    o que já existe).
+--
 -- Modelo:
 --   * Cada celular tem uma identidade própria (device_identities),
 --     criada no primeiro login Supabase Auth do aparelho.
@@ -12,9 +16,9 @@
 --   * O destinatário busca suas mensagens, grava local e apaga
 --     do servidor (fila temporária — o histórico fica só no
 --     aparelho, conforme a proposta offline-first do SafeTalk).
---   * MÍDIA PEQUENA (foto/áudio <= ~1 MB) viaja inline em base64 na
---     própria fila (coluna media_base64) e é apagada junto com a
---     mensagem quando o destinatário coleta. Arquivos maiores
+--   * MÍDIA PEQUENA (foto/áudio <= ~1 MB) viaja inline em base64
+--     na própria fila (coluna media_base64) e é apagada junto com
+--     a mensagem quando o destinatário coleta. Arquivos maiores
 --     (vídeo etc.) ficarão no Supabase Storage numa fase futura.
 --   * SUPERVISÃO: os PAIS da mesma família podem LER (não apagar)
 --     as mensagens em que remetente ou destinatário seja uma
@@ -32,7 +36,7 @@ create table if not exists public.device_identities (
     owner_id text not null unique,         -- = auth.uid() (texto) após o login
     login_identifier text not null unique, -- e-mail/@usuário do perfil local
     display_name text not null default '',
-    family_code text not null default '',
+    family_code text not null default '',  -- '' = ainda sem família; o upsert substitui ao entrar/criar
     role text not null default 'CHILD',    -- 'PARENT' ou 'CHILD'
     created_at timestamptz not null default now()
 );
@@ -50,12 +54,16 @@ create table if not exists public.device_messages (
     text text not null default '',
     media_type text not null default 'TEXT',
     media_uri text,
-    media_base64 text,                     -- conteúdo inline (base64) para foto/áudio pequenos (~<= 1 MB)
     media_duration_seconds integer default 0,
     formatted_time text not null default '00:00',
     timestamp bigint not null default 0,
     created_at timestamptz not null default now()
 );
+
+-- Migração suave: tabela criada por versão anterior do script
+-- ganha a coluna nova da mídia inline sem quebrar nada.
+alter table public.device_messages
+    add column if not exists media_base64 text;
 
 create index if not exists idx_device_messages_recipient
     on public.device_messages (recipient_id, created_at);
@@ -68,7 +76,8 @@ create unique index if not exists uq_device_messages_client
 alter table public.device_messages enable row level security;
 alter table public.device_identities enable row level security;
 
--- Enviar: apenas em nome de si mesmo
+-- Policies re-executáveis: apaga e recria.
+drop policy if exists "enviar em nome de si" on public.device_messages;
 create policy "enviar em nome de si"
 on public.device_messages
 for insert
@@ -76,6 +85,7 @@ to authenticated
 with check (lower(sender_id) = lower(auth.email()));
 
 -- Destinatário lê as mensagens endereçadas a ele
+drop policy if exists "destinatario le as proprias" on public.device_messages;
 create policy "destinatario le as proprias"
 on public.device_messages
 for select
@@ -85,6 +95,7 @@ using (lower(recipient_id) = lower(auth.email()));
 -- SUPERVISÃO: pais da família leem mensagens cujo remetente OU
 -- destinatário seja uma CRIANÇA da mesma família. Nunca mensagens
 -- entre dois adultos.
+drop policy if exists "pais supervisionam filhos" on public.device_messages;
 create policy "pais supervisionam filhos"
 on public.device_messages
 for select
@@ -113,6 +124,7 @@ using (
 );
 
 -- Apagar da fila: SOMENTE o destinatário (pais leem, não apagam)
+drop policy if exists "destinatario apaga da fila" on public.device_messages;
 create policy "destinatario apaga da fila"
 on public.device_messages
 for delete
@@ -120,12 +132,14 @@ to authenticated
 using (lower(recipient_id) = lower(auth.email()));
 
 -- Identidade do dispositivo: o dono insere/lê a própria linha
+drop policy if exists "identidade do dono - insert" on public.device_identities;
 create policy "identidade do dono - insert"
 on public.device_identities
 for insert
 to authenticated
 with check (owner_id = auth.uid()::text and lower(login_identifier) = lower(auth.email()));
 
+drop policy if exists "identidade do dono - select" on public.device_identities;
 create policy "identidade do dono - select"
 on public.device_identities
 for select
@@ -134,21 +148,43 @@ using (owner_id = auth.uid()::text);
 
 -- ------------------------------------------------------------
 -- 4) Realtime (opcional agora, usado depois p/ instantâneo)
+--    Tolerante a repetição: se a tabela já está na publicação,
+--    apenas ignora o erro "duplicate_object".
 -- ------------------------------------------------------------
-alter publication supabase_realtime add table public.device_messages;
+do $pub$
+begin
+  begin
+    alter publication supabase_realtime add table public.device_messages;
+  exception when duplicate_object then
+    null; -- já é membro da publicação: tudo certo
+  end;
+end $pub$;
 
 -- ------------------------------------------------------------
 -- 5) Limpeza automática: mensagem não coletada em 7 dias expira
+--    O bloco só agenda o cron se o pg_cron existir no projeto
+--    (no Supabase ele fica em Database > Extensions). Sem pg_cron
+--    o script termina com sucesso mesmo assim.
 -- ------------------------------------------------------------
 create or replace function public.purge_old_device_messages()
-returns void as $$
+returns void as $fn$
 begin
   delete from public.device_messages
   where created_at < now() - interval '7 days';
 end;
-$$ language plpgsql security definer;
+$fn$ language plpgsql security definer;
 
--- roda todo dia às 3h da manhã (extensão pg_cron do Supabase)
--- se pg_cron não estiver habilitado, comente as 2 linhas abaixo:
-select cron.schedule('purge-device-messages', '0 3 * * *',
-  $$ select public.purge_old_device_messages(); $$);
+do $cron$
+begin
+  if to_regproc('cron.schedule') is not null then
+    begin
+      perform cron.schedule(
+        'purge-device-messages',
+        '0 3 * * *',
+        $job$ select public.purge_old_device_messages(); $job$
+      );
+    exception when others then
+      null; -- já agendado ou indisponível: não bloqueia o schema
+    end;
+  end if;
+end $cron$;
