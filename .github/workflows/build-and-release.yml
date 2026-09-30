@@ -43,11 +43,15 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         run: |
+          # Valor NUNCA pode ser vazio: BuildConfig com "" quebra o javac.
+          # Sem secret, usa o placeholder (SupabaseConfig detecta e desliga o sync).
+          KEY="${SUPABASE_ANON_KEY:-COLOQUE_SUA_ANON_KEY_AQUI}"
+          URL="${SUPABASE_URL:-https://nxmscabgbcwbifwhijwu.supabase.co}"
           {
-            echo "SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-}"
-            echo "SUPABASE_URL=${SUPABASE_URL:-https://nxmscabgbcwbifwhijwu.supabase.co}"
+            echo "SUPABASE_ANON_KEY=${KEY}"
+            echo "SUPABASE_URL=${URL}"
           } > .env
-          if grep -q "SUPABASE_ANON_KEY=$" .env; then
+          if [ "$KEY" = "COLOQUE_SUA_ANON_KEY_AQUI" ]; then
             echo "⚠️ Secret SUPABASE_ANON_KEY não configurado - app sairá com sync desligado"
           else
             echo "🔐 .env gerado com Supabase configurado (sync ativo)"
