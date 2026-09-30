@@ -6,11 +6,27 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.clickable
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.TextButton
 import androidx.compose.ui.text.style.TextAlign
 
 import androidx.compose.foundation.layout.Arrangement
@@ -28,8 +44,10 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -79,6 +97,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.app.Activity
+import android.content.Intent
+import coil.compose.AsyncImage
+import coil.compose.rememberAsyncImagePainter
+import java.io.File
 import com.example.data.model.ChatMessageEntity
 import com.example.data.model.ContactEntity
 import com.example.ui.theme.FamilyAlertRed
@@ -91,6 +114,14 @@ import com.example.ui.theme.WhatsAppIncomingBubble
 import com.example.ui.theme.WhatsAppOutgoingBubble
 import com.example.ui.viewmodel.AppRole
 import com.example.ui.viewmodel.FamilySafeViewModel
+
+/** 0:07 / 1:23 — rótulo do áudio no balão. */
+private fun formatDurationLabel(totalSeconds: Int): String {
+    val safe = totalSeconds.coerceAtLeast(0)
+    val minutes = safe / 60
+    val seconds = safe % 60
+    return "%d:%02d".format(minutes, seconds)
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -108,6 +139,8 @@ fun ChatDetailScreen(
     val isParentReview by viewModel.isParentReviewModeActive.collectAsState()
     val profile by viewModel.childProfile.collectAsState()
     val tasks by viewModel.tasks.collectAsState()
+    val pendingPhotoUri by viewModel.pendingPhotoUri.collectAsState()
+    val showMicPermissionDialog by viewModel.showMicPermissionDialog.collectAsState()
 
     val isParentAuditing = currentRole == AppRole.PARENT || isParentReview
 
@@ -115,6 +148,22 @@ fun ChatDetailScreen(
     var showAttachmentMenu by remember { mutableStateOf(false) }
     var showTaskPicker by remember { mutableStateOf(false) }
     var exportReportNotice by remember { mutableStateOf<String?>(null) }
+    var showMicRationale by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+
+    // Escolhe foto da galeria; a permissão é concedida pelo sistema
+    // (Photo Picker) e a confirmação de envio acontece num dialog.
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) viewModel.pendingPhotoUri.value = uri
+    }
+
+    // Dispara direto para Configurações quando o usuário marcou "não perguntar".
+    val micSettingsLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { }
 
     Column(
         modifier = modifier
@@ -463,18 +512,28 @@ fun ChatDetailScreen(
                     }
                 }
 
-                items(messages, key = { it.id }) { msg ->
-                    ChatMessageBubble(
-                        message = msg,
-                        isPlayingAudio = playingAudioId == msg.id,
-                        audioProgress = if (playingAudioId == msg.id) audioProgress else 0f,
-                        onTogglePlayAudio = {
-                            viewModel.togglePlayAudio(msg.id, msg.mediaDurationSeconds)
-                        },
-                        onMediaClick = {
-                            viewModel.previewMediaMessage.value = msg
-                        }
-                    )
+                itemsIndexed(messages, key = { _, msg -> msg.id }) { index, msg ->
+                    // A lista não rola sob a top bar: o primeiro balão ganha
+                    // espaço equivalente ao inset da status bar + respiro.
+                    Box(
+                        modifier = Modifier.padding(
+                            top = if (index == 0) {
+                                WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 24.dp
+                            } else 0.dp
+                        )
+                    ) {
+                        ChatMessageBubble(
+                            message = msg,
+                            isPlayingAudio = playingAudioId == msg.id,
+                            audioProgress = if (playingAudioId == msg.id) audioProgress else 0f,
+                            onTogglePlayAudio = {
+                                viewModel.togglePlayAudio(msg.id, msg.mediaDurationSeconds, msg.mediaUri)
+                            },
+                            onMediaClick = {
+                                viewModel.previewMediaMessage.value = msg
+                            }
+                        )
+                    }
                     Spacer(modifier = Modifier.height(6.dp))
                 }
             }
@@ -515,7 +574,7 @@ fun ChatDetailScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Gravando áudio... 0:${recordingSeconds.toString().padStart(2, '0')}",
+                            text = "Gravando áudio... ${formatDurationLabel(recordingSeconds)}",
                             color = FamilyAlertRed,
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp
@@ -620,7 +679,13 @@ fun ChatDetailScreen(
                     } else {
                         // Voice Record Button
                         IconButton(
-                            onClick = { viewModel.startRecordingVoice() },
+                            onClick = {
+                                val granted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                    context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
+                                        PackageManager.PERMISSION_GRANTED
+                                } else true
+                                if (granted) viewModel.startRecordingVoice() else showMicRationale = true
+                            },
                             modifier = Modifier
                                 .size(44.dp)
                                 .clip(CircleShape)
@@ -638,6 +703,95 @@ fun ChatDetailScreen(
                 }
             }
         }
+    }
+
+    // Confirmação de envio da foto escolhida na galeria
+    pendingPhotoUri?.let { uri ->
+        AlertDialog(
+            onDismissRequest = { viewModel.cancelPendingPhoto() },
+            title = { Text("Enviar esta foto?") },
+            text = {
+                Column {
+                    AsyncImage(
+                        model = uri,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 240.dp)
+                            .clip(RoundedCornerShape(12.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "A foto será reduzida e enviada com segurança pelo SafeTalk.",
+                        fontSize = 13.sp,
+                        color = Color(0xFF475569)
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.confirmSendPendingPhoto() }) {
+                    Text("Enviar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.cancelPendingPhoto() }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
+    // Pedir permissão de microfone (primeira gravação)
+    val micPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) viewModel.startRecordingVoice()
+    }
+
+    if (showMicRationale || showMicPermissionDialog) {
+        val permanentlyDenied = context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_DENIED &&
+            !(context as Activity).shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO)
+        AlertDialog(
+            onDismissRequest = {
+                showMicRationale = false
+                viewModel.showMicPermissionDialog.value = false
+            },
+            title = { Text("Permitir microfone?") },
+            text = {
+                Text(
+                    if (permanentlyDenied) {
+                        "Para gravar mensagens de voz, libere o microfone do SafeTalk nas configurações do aparelho."
+                    } else {
+                        "Para gravar mensagens de voz, o SafeTalk precisa de acesso ao microfone do aparelho."
+                    }
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showMicRationale = false
+                    viewModel.showMicPermissionDialog.value = false
+                    if (permanentlyDenied) {
+                        val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                        intent.data = android.net.Uri.fromParts("package", context.packageName, null)
+                        micSettingsLauncher.launch(intent)
+                    } else {
+                        micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                    }
+                }) {
+                    Text("Permitir")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showMicRationale = false
+                    viewModel.showMicPermissionDialog.value = false
+                }) {
+                    Text("Agora não")
+                }
+            }
+        )
     }
 
     // Attachment Modal Sheet
@@ -671,8 +825,10 @@ fun ChatDetailScreen(
                         color = Color(0xFFAC44CF),
                         tag = "attach_photo_button",
                         onClick = {
-                            viewModel.sendPhotoMessage("📸 Foto enviada")
                             showAttachmentMenu = false
+                            photoPickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
                         }
                     )
 
@@ -695,8 +851,12 @@ fun ChatDetailScreen(
                         color = Color(0xFFF59E0B),
                         tag = "attach_audio_button",
                         onClick = {
-                            viewModel.startRecordingVoice()
                             showAttachmentMenu = false
+                            val granted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
+                                    PackageManager.PERMISSION_GRANTED
+                            } else true
+                            if (granted) viewModel.startRecordingVoice() else showMicRationale = true
                         }
                     )
 
@@ -1001,7 +1161,7 @@ fun ChatMessageBubble(
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Text(
-                                        text = "0:${message.mediaDurationSeconds.toString().padStart(2, '0')}",
+                                        text = formatDurationLabel(message.mediaDurationSeconds),
                                         fontSize = 11.sp,
                                         color = Color(0xFF667781)
                                     )
@@ -1017,29 +1177,55 @@ fun ChatMessageBubble(
                     }
 
                     "IMAGE" -> {
-                        // Photo Bubble
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(160.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFFE2E8F0))
-                                .clickable(onClick = onMediaClick),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(
-                                    imageVector = Icons.Default.Image,
+                        // Photo Bubble: arquivo local (enviado ou recebido via base64)
+                        val localFile = remember(message.id, message.mediaUri) { File(message.mediaUri) }
+                        if (message.mediaUri.isNotBlank() && localFile.exists()) {
+                            val painter = rememberAsyncImagePainter(
+                                model = coil.request.ImageRequest.Builder(LocalContext.current)
+                                    .data(localFile)
+                                    .size(coil.size.Size.ORIGINAL)
+                                    .build()
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 260.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color(0xFFE2E8F0))
+                                    .clickable(onClick = onMediaClick),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Image(
+                                    painter = painter,
                                     contentDescription = "Foto",
-                                    tint = FamilySecondary,
-                                    modifier = Modifier.size(48.dp)
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxWidth()
                                 )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = "Toque para ver a foto",
-                                    fontSize = 12.sp,
-                                    color = Color(0xFF475569)
-                                )
+                            }
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(160.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color(0xFFE2E8F0))
+                                    .clickable(onClick = onMediaClick),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(
+                                        imageVector = Icons.Default.Image,
+                                        contentDescription = "Foto",
+                                        tint = FamilySecondary,
+                                        modifier = Modifier.size(48.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "Toque para ver a foto",
+                                        fontSize = 12.sp,
+                                        color = Color(0xFF475569)
+                                    )
+                                }
                             }
                         }
                         if (message.text.isNotBlank()) {

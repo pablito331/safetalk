@@ -30,6 +30,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.io.ByteArrayOutputStream
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -37,6 +39,14 @@ import java.util.Locale
 import com.example.util.AppUpdateInfo
 import com.example.util.GitHubUpdateManager
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.media.MediaPlayer
+import android.media.MediaRecorder
+import android.net.Uri
+import android.util.Base64
 import com.example.data.supabase.SupabaseConfig
 import com.example.data.supabase.SupabaseAuthService
 import com.example.data.supabase.AuthResult
@@ -80,6 +90,83 @@ class FamilySafeViewModel(application: Application) : AndroidViewModel(applicati
 
     private val _selectedContactId = MutableStateFlow<Long?>(null)
     val selectedContactId: StateFlow<Long?> = _selectedContactId.asStateFlow()
+
+    // ---------- Mídia (foto/áudio) ----------
+    private val appContextMedia get() = getApplication<Application>()
+    private var mediaRecorder: MediaRecorder? = null
+    private var currentRecordingFile: File? = null
+    private var mediaPlayer: MediaPlayer? = null
+
+    /** URI da foto escolhida na galeria (o dialog de confirmação observa isto). */
+    val pendingPhotoUri = MutableStateFlow<Uri?>(null)
+
+    /** Mostra o dialog de permissão de microfone (a UI decide como pedir). */
+    val showMicPermissionDialog = MutableStateFlow(false)
+
+    private fun mediaDir(): File =
+        appContextMedia.getExternalFilesDir(null) ?: appContextMedia.filesDir
+
+    /** Envia a foto pendente: downscale, arquivo local e base64 inline na fila. */
+    fun confirmSendPendingPhoto() {
+        val uri = pendingPhotoUri.value ?: return
+        pendingPhotoUri.value = null
+        sendPhotoFromUri(uri)
+    }
+
+    fun cancelPendingPhoto() {
+        pendingPhotoUri.value = null
+    }
+
+    fun sendPhotoFromUri(uri: Uri) {
+        val contactId = _selectedContactId.value ?: return
+        viewModelScope.launch {
+            val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+            var mediaPath = ""
+            var base64 = ""
+            try {
+                val bmp = appContextMedia.contentResolver.openInputStream(uri)?.use {
+                    BitmapFactory.decodeStream(it)
+                }
+                if (bmp != null) {
+                    // Downscale + leve compressão para caber no payload inline (~<= 1 MB).
+                    val maxSide = 1024
+                    val scale = minOf(1f, maxSide.toFloat() / maxOf(bmp.width, bmp.height))
+                    val w = (bmp.width * scale).toInt().coerceAtLeast(1)
+                    val h = (bmp.height * scale).toInt().coerceAtLeast(1)
+                    val scaled = Bitmap.createScaledBitmap(bmp, w, h, true)
+                    val out = ByteArrayOutputStream()
+                    var quality = 80
+                    scaled.compress(Bitmap.CompressFormat.JPEG, quality, out)
+                    while (out.size() > 900_000 && quality > 40) {
+                        quality -= 10
+                        out.reset()
+                        scaled.compress(Bitmap.CompressFormat.JPEG, quality, out)
+                    }
+                    val bytes = out.toByteArray()
+                    val file = File(mediaDir(), "photo_${System.currentTimeMillis()}.jpg")
+                    file.outputStream().use { it.write(bytes) }
+                    mediaPath = file.absolutePath
+                    base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
+                    if (scaled !== bmp) scaled.recycle()
+                    bmp.recycle()
+                }
+            } catch (_: Exception) {
+                mediaPath = ""
+                base64 = ""
+            }
+            repository.sendMessage(
+                ChatMessageEntity(
+                    contactId = contactId,
+                    sender = if (_currentRole.value == AppRole.PARENT) "PARENT" else "ME",
+                    text = "📸 Foto enviada",
+                    mediaType = "IMAGE",
+                    mediaUri = mediaPath,
+                    mediaBase64 = base64,
+                    formattedTime = time
+                )
+            )
+        }
+    }
 
     // Auto-Update States
     val availableUpdate = MutableStateFlow<AppUpdateInfo?>(null)
@@ -514,6 +601,37 @@ class FamilySafeViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun startRecordingVoice() {
+        // Microfone é permissão perigosa: em API < 23 o app pede no install,
+        // a partir da M precisa de concessão em runtime — a UI mostra o dialog.
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M &&
+            appContextMedia.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO)
+            != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            showMicPermissionDialog.value = true
+            return
+        }
+        try {
+            val outFile = File(mediaDir(), "voice_${System.currentTimeMillis()}.m4a")
+            val recorder = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                MediaRecorder(appContextMedia)
+            } else {
+                @Suppress("DEPRECATION")
+                MediaRecorder()
+            }
+            recorder.setAudioSource(MediaRecorder.AudioSource.MIC)
+            recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+            recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+            recorder.setAudioEncodingBitRate(48_000)
+            recorder.setAudioSamplingRate(22_050)
+            recorder.setOutputFile(outFile.absolutePath)
+            recorder.prepare()
+            recorder.start()
+            mediaRecorder = recorder
+            currentRecordingFile = outFile
+        } catch (_: Exception) {
+            mediaRecorder = null
+            currentRecordingFile = null
+        }
         _isRecordingAudio.value = true
         _recordingSeconds.value = 0
         recordTimerJob?.cancel()
@@ -526,6 +644,17 @@ class FamilySafeViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun cancelRecordingVoice() {
+        try {
+            mediaRecorder?.stop()
+        } catch (_: Exception) {
+        }
+        try {
+            mediaRecorder?.release()
+        } catch (_: Exception) {
+        }
+        mediaRecorder = null
+        currentRecordingFile?.delete()
+        currentRecordingFile = null
         _isRecordingAudio.value = false
         recordTimerJob?.cancel()
         _recordingSeconds.value = 0
@@ -533,42 +662,79 @@ class FamilySafeViewModel(application: Application) : AndroidViewModel(applicati
 
     fun finishAndSendVoice() {
         val contactId = _selectedContactId.value ?: return
-        val duration = if (_recordingSeconds.value > 0) _recordingSeconds.value else 4
+        val duration = if (_recordingSeconds.value > 0) _recordingSeconds.value else 1
         _isRecordingAudio.value = false
         recordTimerJob?.cancel()
         _recordingSeconds.value = 0
+        val file = currentRecordingFile
+        mediaRecorder = null
+        currentRecordingFile = null
+        if (file == null) return
 
         viewModelScope.launch {
             val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+            // Cap de ~60s: 48 kbps ~= 360 KB, confortável para o payload inline.
+            val finalDuration = duration.coerceAtMost(60)
+            val bytes = try {
+                file.readBytes()
+            } catch (_: Exception) {
+                null
+            }
+            val tooBig = bytes != null && bytes.size > 900_000
+            val base64 = if (bytes != null && !tooBig) {
+                Base64.encodeToString(bytes, Base64.NO_WRAP)
+            } else ""
             repository.sendMessage(
                 ChatMessageEntity(
                     contactId = contactId,
                     sender = if (_currentRole.value == AppRole.PARENT) "PARENT" else "ME",
-                    text = "Mensagem de voz (${duration}s)",
+                    text = "Mensagem de voz (${finalDuration}s)",
                     mediaType = "AUDIO",
-                    mediaUri = "voice_${System.currentTimeMillis()}",
-                    mediaDurationSeconds = duration,
+                    mediaUri = file.absolutePath,
+                    mediaBase64 = base64,
+                    mediaDurationSeconds = finalDuration,
                     formattedTime = time
                 )
             )
         }
     }
 
-    fun togglePlayAudio(messageId: Long, durationSeconds: Int) {
+    fun togglePlayAudio(messageId: Long, durationSeconds: Int, filePath: String = "") {
         if (_playingAudioMessageId.value == messageId) {
             stopAudioPlayback()
-        } else {
-            stopAudioPlayback()
-            _playingAudioMessageId.value = messageId
-            _audioPlayProgress.value = 0f
-            val totalSteps = (durationSeconds.coerceAtLeast(3)) * 10
-            audioPlayJob = viewModelScope.launch {
-                for (step in 1..totalSteps) {
-                    delay(100)
-                    _audioPlayProgress.value = step.toFloat() / totalSteps
+            return
+        }
+        stopAudioPlayback()
+        _playingAudioMessageId.value = messageId
+        _audioPlayProgress.value = 0f
+
+        // Toca o arquivo local quando existe; sem arquivo, anima como antes.
+        var realDurationMs = durationSeconds.coerceAtLeast(1) * 1000L
+        if (filePath.isNotBlank()) {
+            try {
+                mediaPlayer = MediaPlayer().apply {
+                    setDataSource(filePath)
+                    prepare()
+                    setOnCompletionListener { stopAudioPlayback() }
+                    start()
+                    realDurationMs = duration.toLong()
                 }
-                stopAudioPlayback()
+            } catch (_: Exception) {
+                try {
+                    mediaPlayer?.release()
+                } catch (_: Exception) {
+                }
+                mediaPlayer = null
             }
+        }
+        val totalSteps = ((realDurationMs / 100L).toInt()).coerceAtLeast(30)
+        audioPlayJob = viewModelScope.launch {
+            for (step in 1..totalSteps) {
+                if (!isActive) return@launch
+                delay(100)
+                _audioPlayProgress.value = step.toFloat() / totalSteps
+            }
+            stopAudioPlayback()
         }
     }
 
@@ -576,6 +742,11 @@ class FamilySafeViewModel(application: Application) : AndroidViewModel(applicati
         audioPlayJob?.cancel()
         _playingAudioMessageId.value = null
         _audioPlayProgress.value = 0f
+        try {
+            mediaPlayer?.release()
+        } catch (_: Exception) {
+        }
+        mediaPlayer = null
     }
 
     // Parental Controls: Approve or Block Contact

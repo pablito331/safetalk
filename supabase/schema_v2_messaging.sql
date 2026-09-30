@@ -12,6 +12,10 @@
 --   * O destinatário busca suas mensagens, grava local e apaga
 --     do servidor (fila temporária — o histórico fica só no
 --     aparelho, conforme a proposta offline-first do SafeTalk).
+--   * MÍDIA PEQUENA (foto/áudio <= ~1 MB) viaja inline em base64 na
+--     própria fila (coluna media_base64) e é apagada junto com a
+--     mensagem quando o destinatário coleta. Arquivos maiores
+--     (vídeo etc.) ficarão no Supabase Storage numa fase futura.
 --   * SUPERVISÃO: os PAIS da mesma família podem LER (não apagar)
 --     as mensagens em que remetente ou destinatário seja uma
 --     CRIANÇA da família. Entre adultos da mesma família não há
@@ -46,6 +50,7 @@ create table if not exists public.device_messages (
     text text not null default '',
     media_type text not null default 'TEXT',
     media_uri text,
+    media_base64 text,                     -- conteúdo inline (base64) para foto/áudio pequenos (~<= 1 MB)
     media_duration_seconds integer default 0,
     formatted_time text not null default '00:00',
     timestamp bigint not null default 0,

@@ -89,15 +89,20 @@ class SupabaseSyncService : SupabaseSyncContract {
         if (!isConfigured()) return
         try {
             val token = SupabaseDeviceIdentity.currentAccessToken() ?: return
+            // Mídia inline: só manda base64 quando existe (foto/áudio pequenos já
+            // chegam prontos de quem enviou; o payload fica <= ~1 MB).
+            val inlineBase64 = message.mediaBase64.ifBlank { null }
             val payload = mapOf(
                 "sender_id" to message.senderIdentity,
-                "sender_name" to "",
+                "sender_name" to message.senderName,
                 "recipient_id" to message.recipientIdentity,
-                "family_code" to "",
+                "family_code" to message.familyCode,
                 "client_msg_id" to UUID.randomUUID().toString(),
                 "text" to message.text,
                 "media_type" to message.mediaType,
-                "media_uri" to message.mediaUri.ifBlank { null },
+                // Não envia caminho local: ou vai inline (base64) ou fica p/ Storage depois.
+                "media_uri" to if (inlineBase64 != null) null else message.mediaUri.ifBlank { null },
+                "media_base64" to inlineBase64,
                 "media_duration_seconds" to message.mediaDurationSeconds,
                 "formatted_time" to message.formattedTime,
                 "timestamp" to message.timestamp
@@ -129,6 +134,7 @@ class SupabaseSyncService : SupabaseSyncContract {
                 val text = (row["text"] as? String) ?: ""
                 val mediaType = (row["media_type"] as? String) ?: "TEXT"
                 val mediaUri = (row["media_uri"] as? String) ?: ""
+                val mediaBase64 = (row["media_base64"] as? String) ?: ""
                 val duration = (row["media_duration_seconds"] as? Double)?.toInt() ?: 0
                 val formattedTime = (row["formatted_time"] as? String) ?: ""
                 val ts = (row["timestamp"] as? Double)?.toLong() ?: System.currentTimeMillis()
@@ -139,6 +145,7 @@ class SupabaseSyncService : SupabaseSyncContract {
                     text = text,
                     mediaType = mediaType,
                     mediaUri = mediaUri,
+                    mediaBase64 = mediaBase64,
                     mediaDurationSeconds = duration,
                     timestamp = ts,
                     formattedTime = formattedTime,

@@ -31,7 +31,7 @@ import com.example.data.model.WithdrawalRequestEntity
         WithdrawalRequestEntity::class,
         SiblingAccountEntity::class
     ],
-    version = 7,
+    version = 8, // v8: +mediaBase64/senderName/familyCode em chat_messages (mídia inline)
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -50,6 +50,7 @@ abstract class AppDatabase : RoomDatabase() {
                     "family_safe_db"
                 )
                     // v7: removed all demo/seed data — real families register from scratch.
+                    // v8: mídia inline (mediaBase64/senderName/familyCode) — rebuild local.
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance

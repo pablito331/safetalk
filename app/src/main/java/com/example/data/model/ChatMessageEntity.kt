@@ -11,6 +11,7 @@ data class ChatMessageEntity(
     val text: String = "",
     val mediaType: String = "TEXT", // "TEXT", "AUDIO", "IMAGE", "VIDEO"
     val mediaUri: String = "",
+    val mediaBase64: String = "", // conteúdo inline (base64) na fila Supabase — só em trânsito, não persistido
     val mediaDurationSeconds: Int = 0, // For audio/video length
     val timestamp: Long = System.currentTimeMillis(),
     val formattedTime: String = "14:32",
@@ -19,5 +20,7 @@ data class ChatMessageEntity(
     // --- Mensageria entre dispositivos ---
     val remoteId: String = "",        // uuid da fila no servidor (dedup)
     val senderIdentity: String = "",  // login_identifier de quem enviou
-    val recipientIdentity: String = "" // login_identifier de quem recebe
+    val recipientIdentity: String = "", // login_identifier de quem recebe
+    val senderName: String = "",      // nome de exibição de quem enviou
+    val familyCode: String = ""       // família do remetente (p/ supervisão no servidor)
 )

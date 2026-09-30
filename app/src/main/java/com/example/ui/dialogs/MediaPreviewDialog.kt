@@ -44,8 +44,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import coil.compose.AsyncImage
 import com.example.R
 import com.example.data.model.ChatMessageEntity
+import java.io.File
 import com.example.ui.theme.FamilySecondary
 import kotlinx.coroutines.delay
 
@@ -139,7 +141,13 @@ fun MediaPreviewDialog(
                             }
                         }
                     } else {
-                        // Photo display
+                        // Photo display: arquivo local real quando existir
+                        val localFile = remember(message.id, message.mediaUri) { File(message.mediaUri) }
+                        val model: Any = if (message.mediaUri.isNotBlank() && localFile.exists()) {
+                            localFile
+                        } else {
+                            R.drawable.img_family_banner
+                        }
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth(0.92f)
@@ -148,8 +156,8 @@ fun MediaPreviewDialog(
                                 .background(Color(0xFF1E293B)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Image(
-                                painter = painterResource(id = R.drawable.img_family_banner),
+                            AsyncImage(
+                                model = model,
                                 contentDescription = "Foto Expandida",
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Fit

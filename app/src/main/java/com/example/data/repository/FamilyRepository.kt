@@ -13,9 +13,12 @@ import com.example.data.model.MonthlyRewardEntity
 import com.example.data.model.SiblingAccountEntity
 import com.example.data.model.WithdrawalRequestEntity
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.UUID
 
 import com.example.data.supabase.SupabaseSyncService
 
@@ -66,11 +69,15 @@ class FamilyRepository(
                 newId
             }
 
+            // Persiste SEM o base64 (o conteúdo mora num arquivo local; o payload
+            // inline é só do trânsito na fila) e aponta mediaUri para o arquivo.
             dao.insertMessage(
                 msg.copy(
                     contactId = finalContactId,
                     // Aplica o filtro divertido nas mensagens recebidas
-                    text = com.example.util.FunProfanityFilter.filter(msg.text).sanitizedText
+                    text = com.example.util.FunProfanityFilter.filter(msg.text).sanitizedText,
+                    mediaBase64 = "",
+                    mediaUri = decodeMediaToLocalFile(msg)
                 )
             )
             inserted++
@@ -80,6 +87,35 @@ class FamilyRepository(
         // Remove da fila do servidor o que já foi coletado
         syncService.deleteDelivered(deliveredIds)
         return inserted
+    }
+
+    /**
+     * Decodifica a mídia inline (base64) para um arquivo privado do app e
+     * retorna o caminho local. Mensagens sem base64 voltam inalteradas.
+     */
+    private fun decodeMediaToLocalFile(message: ChatMessageEntity): String {
+        val b64 = message.mediaBase64
+        if (b64.isBlank()) return message.mediaUri
+        return try {
+            val dir = File(
+                SupabaseSyncService.appContext?.filesDir ?: return message.mediaUri,
+                "received_media"
+            )
+            if (!dir.exists()) dir.mkdirs()
+            val ext = when (message.mediaType.uppercase()) {
+                "IMAGE" -> "jpg"
+                "AUDIO" -> "m4a"
+                else -> "bin"
+            }
+            val name = message.remoteId.ifBlank { UUID.randomUUID().toString() }
+            val file = File(dir, "msg_$name.$ext")
+            file.outputStream().use { out ->
+                out.write(java.util.Base64.getDecoder().decode(b64))
+            }
+            file.absolutePath
+        } catch (_: Exception) {
+            message.mediaUri
+        }
     }
 
     val allContacts: Flow<List<ContactEntity>> = dao.getAllContacts()
@@ -104,9 +140,17 @@ class FamilyRepository(
     ): Long {
         val id = dao.insertMessage(message)
         try {
+            // Preenche nome/código da família do remetente (usados pela
+            // supervisão feita no servidor via RLS).
+            val profile = dao.getChildProfile().first()
             syncService.sendMessage(
-                message.copy(id = id)
-                    .copy(senderIdentity = myIdentity, recipientIdentity = contactRemoteIdentity)
+                message.copy(
+                    id = id,
+                    senderIdentity = myIdentity,
+                    recipientIdentity = contactRemoteIdentity,
+                    senderName = message.senderName.ifBlank { profile?.name.orEmpty() },
+                    familyCode = message.familyCode.ifBlank { profile?.familyCode.orEmpty() }
+                )
             )
         } catch (_: Exception) {}
         return id
