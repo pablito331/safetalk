@@ -35,6 +35,24 @@ jobs:
       - name: Make Gradlew Executable
         run: chmod +x ./gradlew
 
+      # Monta o .env em tempo de build a partir de GitHub Secrets
+      # (Settings > Secrets and variables > Actions).
+      # Sem o secret, compila com sync do Supabase desligado (placeholders).
+      - name: Create .env from GitHub Secrets
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        run: |
+          {
+            echo "SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-}"
+            echo "SUPABASE_URL=${SUPABASE_URL:-https://nxmscabgbcwbifwhijwu.supabase.co}"
+          } > .env
+          if grep -q "SUPABASE_ANON_KEY=$" .env; then
+            echo "⚠️ Secret SUPABASE_ANON_KEY não configurado - app sairá com sync desligado"
+          else
+            echo "🔐 .env gerado com Supabase configurado (sync ativo)"
+          fi
+
       - name: Determine Version
         id: version
         run: |
